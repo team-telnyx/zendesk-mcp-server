@@ -121,6 +121,9 @@ import { z } from 'zod';
           }
         }
       },
+      // Note: delete_organization tool commented out for security - could remove customer organizations
+      // Uncomment below to re-enable delete functionality
+      /*
       {
         name: "delete_organization",
         description: "Delete an organization",
@@ -144,4 +147,5 @@ import { z } from 'zod';
           }
         }
       }
+      */
     ];

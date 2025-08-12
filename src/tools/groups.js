@@ -109,6 +109,9 @@ import { z } from 'zod';
           }
         }
       },
+      // Note: delete_group tool commented out for security - could disrupt team structure
+      // Uncomment below to re-enable delete functionality
+      /*
       {
         name: "delete_group",
         description: "Delete a group",
@@ -132,4 +135,5 @@ import { z } from 'zod';
           }
         }
       }
+      */
     ];

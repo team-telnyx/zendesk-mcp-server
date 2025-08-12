@@ -137,6 +137,9 @@ import { z } from 'zod';
           }
         }
       },
+      // Note: delete_ticket tool commented out for security - tickets contain important customer data
+      // Uncomment below to re-enable delete functionality
+      /*
       {
         name: "delete_ticket",
         description: "Delete a ticket",
@@ -160,4 +163,5 @@ import { z } from 'zod';
           }
         }
       }
+      */
     ];

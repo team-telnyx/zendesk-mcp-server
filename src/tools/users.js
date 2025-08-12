@@ -130,6 +130,9 @@ import { z } from 'zod';
           }
         }
       },
+      // Note: delete_user tool commented out for security - could accidentally remove customer accounts
+      // Uncomment below to re-enable delete functionality
+      /*
       {
         name: "delete_user",
         description: "Delete a user",
@@ -153,4 +156,5 @@ import { z } from 'zod';
           }
         }
       }
+      */
     ];
