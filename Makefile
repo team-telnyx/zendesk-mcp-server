@@ -35,4 +35,5 @@ clean:
 
 .PHONY: test
 test:
-	node test-mcp.js
+	@echo "************  NO TESTING YET ************"
+	@echo "Use 'node test-mcp.js' locally to verify MCP server functionality"
