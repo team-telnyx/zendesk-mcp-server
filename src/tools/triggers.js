@@ -145,6 +145,9 @@ import { z } from 'zod';
           }
         }
       },
+      // Note: delete_trigger tool commented out for security - triggers are critical for support automation
+      // Uncomment below to re-enable delete functionality
+      /*
       {
         name: "delete_trigger",
         description: "Delete a trigger",
@@ -168,4 +171,5 @@ import { z } from 'zod';
           }
         }
       }
+      */
     ];

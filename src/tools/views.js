@@ -135,6 +135,9 @@ import { z } from 'zod';
           }
         }
       },
+      // Note: delete_view tool commented out for security - views are critical for support workflow
+      // Uncomment below to re-enable delete functionality
+      /*
       {
         name: "delete_view",
         description: "Delete a view",
@@ -158,4 +161,5 @@ import { z } from 'zod';
           }
         }
       }
+      */
     ];

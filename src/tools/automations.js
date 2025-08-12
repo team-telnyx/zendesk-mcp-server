@@ -145,6 +145,9 @@ import { z } from 'zod';
           }
         }
       },
+      // Note: delete_automation tool commented out for security - automations are critical for support workflow
+      // Uncomment below to re-enable delete functionality
+      /*
       {
         name: "delete_automation",
         description: "Delete an automation",
@@ -168,4 +171,5 @@ import { z } from 'zod';
           }
         }
       }
+      */
     ];
