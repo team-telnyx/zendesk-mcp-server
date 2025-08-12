@@ -8,6 +8,8 @@ A comprehensive Model Context Protocol (MCP) server for interacting with the Zen
 - Tools for managing tickets, users, organizations, and more
 - Resources for accessing Zendesk API documentation
 - Secure authentication with Zendesk API tokens
+- **Enhanced client logging and connection monitoring**
+- **Real-time connection tracking with automatic memory cleanup**
 
 ## Getting Started
 
@@ -57,6 +59,7 @@ npm run dev:http
 The server will run on port 3000 (or PORT env variable) with:
 - Streamable HTTP MCP endpoint: `http://localhost:3000/mcp`
 - Health check: `http://localhost:3000/health`
+- Connection monitoring: `http://localhost:3000/connections`
 - Metrics: `http://localhost:3000/metrics`
 
 ### Testing MCP Server
@@ -203,6 +206,67 @@ To connect to the remote MCP server from Claude Code:
 ## Available Resources
 
 - `zendesk://docs/{section}`: Access documentation for different sections of the Zendesk API
+
+## Connection Monitoring
+
+The server includes comprehensive client logging and monitoring capabilities:
+
+### Enhanced Logging Features
+- **Client IP tracking**: Identifies client IPs including proxy-forwarded addresses
+- **User-Agent logging**: Captures client application information
+- **Connection duration tracking**: Monitors session lifetimes
+- **Real-time session monitoring**: Shows active connections and total counts
+- **Error tracking**: Detailed logging of connection failures with client context
+
+### Monitoring Endpoints
+
+#### `/connections` - Real-time Connection Status
+```bash
+curl http://localhost:3000/connections
+```
+Returns detailed information about:
+- Active MCP sessions with client details
+- Server uptime and connection statistics  
+- Memory usage and cleanup status
+- Session duration and client identification
+
+#### `/health` - Server Health Check
+```bash
+curl http://localhost:3000/health
+```
+Basic server health status for monitoring systems.
+
+#### `/metrics` - Prometheus Metrics
+```bash
+curl http://localhost:3000/metrics
+```
+Prometheus-compatible metrics including:
+- `zendesk_mcp_server_up` - Server status
+- `zendesk_mcp_server_active_sessions` - Active session count
+- `zendesk_mcp_server_total_connections` - Total connection counter
+
+### Memory Management
+- **Automatic cleanup**: Stale sessions cleaned after 30 minutes
+- **Memory bounds**: Recent client cache limited to 30 seconds
+- **Periodic reporting**: Health reports every 5 minutes
+- **Fail-safe mechanisms**: Prevents memory leaks from crashed clients
+
+### Example Console Output
+```
+🚀 Zendesk MCP Server running on http (port 3000)
+Client logging: Enhanced with IP tracking and error monitoring
+
+🔌 MCP session initialized: abc-123 (#1)
+   Client: 192.168.1.100 | Claude-Desktop/1.0
+   Active sessions: 1
+
+✓ MCP request completed (150ms) - 192.168.1.100
+
+📊 Health Report: 1 active MCP sessions | Total connections: 1
+   - abc-123: 192.168.1.100
+```
+
+All logging is purely observational and does not affect MCP protocol communication or tool functionality.
 
 ## License
 
