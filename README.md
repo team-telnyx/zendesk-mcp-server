@@ -121,7 +121,7 @@ To connect to the remote MCP server from Claude Code:
 
 1. **Streamable HTTP Connection**: Use the HTTP endpoint
    ```
-   http://zendesk-mcp-server.internal.telnyx.com:3000/mcp
+   [http://zendesk-mcp-server.internal.telnyx.com:3000/mcp](http://zendesk-mcp-server.query.prod.telnyx.io:3000/mcp)
    ```
 
 2. **Configure in Claude Code**: Add as a remote MCP server in your configuration using the Streamable HTTP transport
