@@ -16,8 +16,8 @@ project:
   private_api: true
 
 autoscaling:
-  minInstances: 2
-  maxInstances: 4
+  minInstances: 1
+  maxInstances: 1
   averageMemory: 200
   averageCpu: 50
 
@@ -60,9 +60,3 @@ alerts:
     prometheus_expression: (sum(kube_metrics_server_pods_cpu{pod_name=~"zendesk-mcp-server(-.{1,10}-.{1,10})$",pod_container_name=~"zendesk-mcp-server"}) by (pod_name,pod_container_name) / 1000000) > 80
     prometheus_for: "5m"
     resolution_document: "https://app.getguru.com/card/cp45qLbi/Zendesk-MCP-Server-Alerts"
-
-  env:
-    secret:
-      - ZENDESK_SUBDOMAIN
-      - ZENDESK_EMAIL
-      - ZENDESK_API_TOKEN
