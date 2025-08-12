@@ -32,6 +32,7 @@
 
     ### Running the Server
 
+    #### Local Development (stdio transport)
     Start the server:
     ```
     npm start
@@ -42,12 +43,88 @@
     npm run dev
     ```
 
-    ### Testing with MCP Inspector
-
-    Test the server using the MCP Inspector:
+    #### Remote Deployment (Streamable HTTP transport)
+    Start the Streamable HTTP server for remote access:
     ```
+    npm run start:http
+    ```
+
+    For development with auto-restart:
+    ```
+    npm run dev:http
+    ```
+
+    The server will run on port 3000 (or PORT env variable) with:
+    - Streamable HTTP MCP endpoint: `http://localhost:3000/mcp`
+    - Health check: `http://localhost:3000/health`
+    - Metrics: `http://localhost:3000/metrics`
+
+    ### Testing MCP Server
+
+    This repository includes a comprehensive test script to verify that MCP tools are accessible through both transport methods.
+
+    #### Test Stdio Transport (Local Development)
+    ```bash
+    # Test the stdio transport with 49 Zendesk API tools
+    node test-mcp.js
+    ```
+
+    #### Test Streamable HTTP Transport (Remote Deployment)
+    ```bash
+    # Start the HTTP server in one terminal
+    npm run start:http
+
+    # In another terminal, test the HTTP transport
+    node test-mcp.js http
+    ```
+
+    #### Test with MCP Inspector
+    Test the stdio server using the official MCP Inspector:
+    ```bash
     npm run inspect
     ```
+
+    The test script will verify:
+    - ✅ Server connectivity via both transports
+    - ✅ Tool discovery (should find 49 tools)
+    - ✅ Basic MCP protocol functionality
+    - 🔍 Sample tool names: `list_tickets`, `get_ticket`, `create_ticket`, `update_ticket`, `delete_ticket`, ...
+
+    ## Remote Deployment
+
+    This server can be deployed remotely using Telnyx's internal infrastructure:
+
+    ### Development Environment
+    ```bash
+    # Deploy to dev environment
+    git push origin main
+    # Jenkins will automatically build and deploy to dev k8s cluster
+    ```
+
+    ### Production Environment
+    ```bash
+    # Deploy to production environment
+    # (requires approval and proper CI/CD process)
+    ```
+
+    ### Docker
+
+    Build and run with Docker:
+    ```bash
+    make build
+    make start
+    ```
+
+    ### Connecting to Remote Server
+
+    To connect to the remote MCP server from Claude Code:
+
+    1. **Streamable HTTP Connection**: Use the HTTP endpoint
+       ```
+       http://zendesk-mcp-server.internal.telnyx.com:3000/mcp
+       ```
+
+    2. **Configure in Claude Code**: Add as a remote MCP server in your configuration using the Streamable HTTP transport
 
     ## Available Tools
 
