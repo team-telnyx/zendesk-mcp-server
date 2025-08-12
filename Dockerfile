@@ -31,9 +31,14 @@ COPY src/ ./src/
 COPY CLAUDE.md ./
 COPY README.md ./
 
-# Create non-root user for security
-RUN groupadd -r mcpserver && useradd -r -g mcpserver mcpserver
+# Create non-root user for security with home directory
+RUN groupadd -r mcpserver && useradd -r -g mcpserver -m -d /home/mcpserver mcpserver
 RUN chown -R mcpserver:mcpserver /app
+
+# Set npm cache directory to avoid permission issues
+ENV npm_config_cache=/app/.npm
+RUN mkdir -p /app/.npm && chown -R mcpserver:mcpserver /app/.npm
+
 USER mcpserver
 
 # Expose port
