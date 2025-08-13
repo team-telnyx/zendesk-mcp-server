@@ -9,6 +9,9 @@ import morgan from 'morgan';
 // Load environment variables
 dotenv.config();
 
+// Authentication configuration
+const MCP_AUTH_TOKEN = process.env.MCP_AUTH_TOKEN;
+
 const app = express();
 const port = process.env.PORT || 3000;
 const isLocalInstance = process.env.LOCAL === 'true';
@@ -180,6 +183,36 @@ const RECENT_CLIENT_TTL = 30000; // 30 seconds
 const SESSION_TIMEOUT = 30 * 60 * 1000; // 30 minutes - sessions older than this are considered stale
 const CLEANUP_INTERVAL = 5 * 60 * 1000; // 5 minutes - how often to run cleanup
 
+// Authentication middleware
+const authenticateRequest = (req, res, next) => {
+  // Skip authentication if no token is configured (local development)
+  if (!MCP_AUTH_TOKEN) {
+    return next();
+  }
+
+  const authHeader = req.headers.authorization;
+  
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({
+      error: 'Unauthorized',
+      message: 'Bearer token required',
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  const token = authHeader.substring(7); // Remove 'Bearer ' prefix
+  
+  if (token !== MCP_AUTH_TOKEN) {
+    return res.status(401).json({
+      error: 'Unauthorized',
+      message: 'Invalid token',
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  next();
+};
+
 // Helper to get client info from request
 const getClientInfo = (req) => {
   const ip = req.ip || req.connection.remoteAddress || req.socket.remoteAddress || 
@@ -256,7 +289,7 @@ const transport = new StreamableHTTPServerTransport({
 server.connect(transport);
 
 // Handle MCP requests at /mcp endpoint
-app.all('/mcp', async (req, res) => {
+app.all('/mcp', authenticateRequest, async (req, res) => {
   const clientInfo = getClientInfo(req);
   const startTime = Date.now();
   
@@ -348,6 +381,7 @@ app.listen(port, () => {
   
   console.log(`${GREEN}🚀 Zendesk MCP Server running on http (port ${port})${NC}`);
   console.log(`${BLUE}Environment: ${environment}${NC}`);
+  console.log(`${BLUE}Authentication: ${MCP_AUTH_TOKEN ? 'Enabled (Bearer token required)' : 'Disabled (local development)'}${NC}`);
   console.log(`${BLUE}Client logging: Enhanced with IP tracking and error monitoring${NC}`);
   
   if (isLocalInstance) {

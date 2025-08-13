@@ -22,6 +22,11 @@ The server requires Zendesk API credentials in a `.env` file:
 ZENDESK_SUBDOMAIN=your-subdomain
 ZENDESK_EMAIL=your-email@example.com
 ZENDESK_API_TOKEN=your-api-token
+
+# Optional: MCP authentication token for HTTP transport
+# If set, clients must provide "Authorization: Bearer <token>" header
+# If not set, no authentication required (local development)
+MCP_AUTH_TOKEN=your-mcp-auth-token
 ```
 
 ## Architecture Overview
@@ -101,6 +106,11 @@ The server supports both local stdio transport and remote Streamable HTTP transp
 ### Remote Connection
 
 Clients connect via Streamable HTTP: `http://zendesk-mcp-server.internal.telnyx.com:3000/mcp`
+
+For remote connections, if `MCP_AUTH_TOKEN` is configured, clients must include authentication:
+```
+Authorization: Bearer <your-mcp-auth-token>
+```
 
 ### Testing
 
