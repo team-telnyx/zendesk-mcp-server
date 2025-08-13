@@ -26,7 +26,7 @@ deploy:
   cpu_limit: 200
   memory: 300
   memory_limit: 600
-  k8s_clusters: ["backend-ch1-prod", "backend-dc2-prod"]
+  k8s_clusters: ["backend-ch1-prod"]
   node_profile: generic
   secrets_from: file
   instances: 2
