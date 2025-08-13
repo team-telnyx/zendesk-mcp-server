@@ -2,7 +2,7 @@
 import express from 'express';
 import { randomUUID } from 'node:crypto';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import { server } from './server.js';
+import { createServer } from './server.js';
 import dotenv from 'dotenv';
 import morgan from 'morgan';
 
@@ -39,8 +39,14 @@ const getBaseUrl = () => {
   return `http://localhost:${port}`;
 };
 
-// Enable JSON parsing
-app.use(express.json());
+// Enable JSON parsing (exclude MCP endpoint which handles raw requests)
+app.use('/mcp', express.raw({ type: '*/*' })); // Raw body for MCP
+app.use((req, res, next) => {
+  if (req.path === '/mcp') {
+    return next(); // Skip JSON parsing for MCP
+  }
+  express.json()(req, res, next); // Apply JSON parsing for other routes
+});
 
 // Setup Morgan logging middleware (similar to noc-chatbot)
 morgan.token('colored-status', (req, res) => {
@@ -133,6 +139,7 @@ app.get('/connections', (req, res) => {
     const clientInfo = sessionClientInfo.get(sessionId);
     const startTime = sessionTimestamps.get(sessionId);
     const duration = startTime ? now - startTime : 0;
+    const hasServerInstance = sessionServers.has(sessionId);
     
     return {
       sessionId,
@@ -141,7 +148,9 @@ app.get('/connections', (req, res) => {
       host: clientInfo?.host || 'unknown',
       connectedAt: startTime ? new Date(startTime).toISOString() : 'unknown',
       durationMs: duration,
-      durationHuman: duration > 0 ? `${Math.floor(duration / 1000)}s` : 'unknown'
+      durationHuman: duration > 0 ? `${Math.floor(duration / 1000)}s` : 'unknown',
+      hasServerInstance,
+      architecture: 'per-session-server'
     };
   });
 
@@ -159,7 +168,8 @@ app.get('/connections', (req, res) => {
     },
     memory: {
       sessionInfoEntries: sessionClientInfo.size,
-      recentClientEntries: recentClients.size,
+      sessionServers: sessionServers.size,
+      sessionTimestamps: sessionTimestamps.size,
       sessionTimeoutMs: SESSION_TIMEOUT,
       cleanupIntervalMs: CLEANUP_INTERVAL,
       lastCleanupWould: `Clean ${Array.from(sessionTimestamps.values()).filter(ts => now - ts > SESSION_TIMEOUT).length} stale sessions`
@@ -168,16 +178,13 @@ app.get('/connections', (req, res) => {
   });
 });
 
-// Track client info for MCP sessions
-const sessionClientInfo = new Map();
-const sessionTimestamps = new Map(); // Track when sessions started
-const activeConnections = new Set();
+// Per-session server management
+const sessionServers = new Map(); // sessionId -> { server, transport }
+const sessionClientInfo = new Map(); // sessionId -> client info  
+const sessionTimestamps = new Map(); // sessionId -> timestamp
+const activeConnections = new Set(); // active session IDs
 let connectionCounter = 0;
 let serverStartTime = Date.now();
-
-// Temporary storage for recent client info to associate with new sessions
-const recentClients = new Map();
-const RECENT_CLIENT_TTL = 30000; // 30 seconds
 
 // Memory cleanup configuration
 const SESSION_TIMEOUT = 30 * 60 * 1000; // 30 minutes - sessions older than this are considered stale
@@ -223,85 +230,91 @@ const getClientInfo = (req) => {
   return { ip, userAgent, host };
 };
 
-// Helper to find recent client info for new sessions
-const findRecentClientInfo = () => {
-  const now = Date.now();
-  // Clean up expired entries and find most recent
-  let mostRecent = null;
-  let mostRecentTime = 0;
+
+// Per-session transport factory
+function createSessionTransport(sessionId) {
+  const transport = new StreamableHTTPServerTransport({
+    sessionIdGenerator: () => sessionId,
+    onsessioninitialized: (actualSessionId) => {
+      activeConnections.add(actualSessionId);
+      console.log(`${GREEN}🔌 MCP session initialized: ${actualSessionId}${NC}`);
+    },
+    onsessionclosed: (actualSessionId) => {
+      const clientInfo = sessionClientInfo.get(actualSessionId);
+      const startTime = sessionTimestamps.get(actualSessionId);
+      const duration = startTime ? Date.now() - startTime : 0;
+      
+      console.log(`${YELLOW}🔌 MCP session closed: ${actualSessionId} - Duration: ${Math.floor(duration / 1000)}s${NC}`);
+      
+      // Cleanup session data
+      activeConnections.delete(actualSessionId);
+      sessionServers.delete(actualSessionId);
+      sessionClientInfo.delete(actualSessionId);
+      sessionTimestamps.delete(actualSessionId);
+      
+      console.log(`${BLUE}   Active sessions: ${activeConnections.size}${NC}`);
+    }
+  });
   
-  for (const [clientKey, { info, timestamp }] of recentClients) {
-    if (now - timestamp > RECENT_CLIENT_TTL) {
-      recentClients.delete(clientKey);
-    } else if (timestamp > mostRecentTime) {
-      mostRecent = info;
-      mostRecentTime = timestamp;
-    }
-  }
-  
-  return mostRecent;
-};
+  return transport;
+}
 
-// Create Streamable HTTP transport
-const transport = new StreamableHTTPServerTransport({
-  sessionIdGenerator: () => randomUUID(),
-  onsessioninitialized: (sessionId) => {
-    connectionCounter++;
-    activeConnections.add(sessionId);
-    sessionTimestamps.set(sessionId, Date.now());
-    
-    // Try to find matching recent client info
-    const clientInfo = sessionClientInfo.get(sessionId) || findRecentClientInfo();
-    if (clientInfo && !sessionClientInfo.has(sessionId)) {
-      sessionClientInfo.set(sessionId, clientInfo);
-    }
-    
-    if (clientInfo) {
-      console.log(`${GREEN}🔌 MCP session initialized: ${sessionId} (#${connectionCounter})${NC}`);
-      console.log(`${BLUE}   Client: ${clientInfo.ip} | ${clientInfo.userAgent.substring(0, 50)}${clientInfo.userAgent.length > 50 ? '...' : ''}${NC}`);
-      console.log(`${BLUE}   Active sessions: ${activeConnections.size}${NC}`);
-    } else {
-      console.log(`${GREEN}🔌 MCP session initialized: ${sessionId} (#${connectionCounter})${NC}`);
-      console.log(`${BLUE}   Active sessions: ${activeConnections.size}${NC}`);
-    }
-  },
-  onsessionclosed: (sessionId) => {
-    activeConnections.delete(sessionId);
-    
-    const clientInfo = sessionClientInfo.get(sessionId);
-    const startTime = sessionTimestamps.get(sessionId);
-    const duration = startTime ? Date.now() - startTime : 0;
-    
-    if (clientInfo) {
-      console.log(`${YELLOW}🔌 MCP session closed: ${sessionId} (${clientInfo.ip}) - Duration: ${Math.floor(duration / 1000)}s${NC}`);
-      console.log(`${BLUE}   Active sessions: ${activeConnections.size}${NC}`);
-      sessionClientInfo.delete(sessionId); // Cleanup
-    } else {
-      console.log(`${YELLOW}🔌 MCP session closed: ${sessionId} - Duration: ${Math.floor(duration / 1000)}s${NC}`);
-      console.log(`${BLUE}   Active sessions: ${activeConnections.size}${NC}`);
-    }
-    
-    sessionTimestamps.delete(sessionId); // Cleanup timestamp
-  }
-});
-
-// Connect the server to the transport
-server.connect(transport);
-
-// Handle MCP requests at /mcp endpoint
+// MCP endpoint with per-session server isolation
 app.all('/mcp', authenticateRequest, async (req, res) => {
   const clientInfo = getClientInfo(req);
   const startTime = Date.now();
   
-  // Store recent client info for session association
-  const clientKey = `${clientInfo.ip}-${clientInfo.userAgent}`;
-  recentClients.set(clientKey, { info: clientInfo, timestamp: startTime });
+  // Parse JSON body if it's a buffer (from express.raw)
+  let parsedBody = req.body;
+  if (Buffer.isBuffer(req.body)) {
+    try {
+      parsedBody = JSON.parse(req.body.toString());
+    } catch (e) {
+      parsedBody = {};
+    }
+  }
+  
+  // Generate or get session ID from headers
+  let sessionId = req.headers['mcp-session-id'] || randomUUID();
+  
+  console.log(`${BLUE}🔍 MCP Request Details:${NC}`);
+  console.log(`${BLUE}   Session ID: ${sessionId}${NC}`);
+  console.log(`${BLUE}   Method: ${req.method}${NC}`);
+  console.log(`${BLUE}   MCP Method: ${parsedBody?.method}${NC}`);
+  console.log(`${BLUE}   Client: ${clientInfo.ip}${NC}`);
   
   try {
-    await transport.handleRequest(req, res, req.body);
+    // Get or create server instance for this session
+    let sessionData = sessionServers.get(sessionId);
+    
+    if (!sessionData) {
+      console.log(`${GREEN}🆕 Creating new server instance for session ${sessionId}${NC}`);
+      
+      // Create new server and transport for this session
+      const sessionServer = createServer();
+      const sessionTransport = createSessionTransport(sessionId);
+      
+      // Connect server to transport
+      sessionServer.connect(sessionTransport);
+      
+      // Store session data
+      sessionData = { server: sessionServer, transport: sessionTransport };
+      sessionServers.set(sessionId, sessionData);
+      sessionClientInfo.set(sessionId, clientInfo);
+      sessionTimestamps.set(sessionId, startTime);
+      
+      connectionCounter++;
+      console.log(`${BLUE}   Client: ${clientInfo.ip} | ${clientInfo.userAgent}${NC}`);
+      console.log(`${BLUE}   Active sessions: ${sessionServers.size}${NC}`);
+    } else {
+      console.log(`${BLUE}♻️  Using existing server instance for session ${sessionId}${NC}`);
+    }
+    
+    // Handle the request with the session-specific transport
+    await sessionData.transport.handleRequest(req, res, parsedBody);
     
     const duration = Date.now() - startTime;
-    console.log(`${GREEN}✓ MCP request completed (${duration}ms) - ${clientInfo.ip}${NC}`);
+    console.log(`${GREEN}✓ MCP request completed (${duration}ms) - ${sessionId} - ${clientInfo.ip}${NC}`);
     
   } catch (error) {
     const duration = Date.now() - startTime;
@@ -309,8 +322,8 @@ app.all('/mcp', authenticateRequest, async (req, res) => {
     const errorMsg = error.message || 'Unknown error';
     
     console.error(`${RED}❌ MCP request failed (${duration}ms)${NC}`);
+    console.error(`${RED}   Session ID: ${sessionId}${NC}`);
     console.error(`${RED}   Client: ${clientInfo.ip}${NC}`);
-    console.error(`${RED}   User-Agent: ${clientInfo.userAgent}${NC}`);
     console.error(`${RED}   Error Type: ${errorType}${NC}`);
     console.error(`${RED}   Error Message: ${errorMsg}${NC}`);
     console.error(`${RED}   Method: ${req.method} ${req.url}${NC}`);
@@ -335,6 +348,7 @@ const cleanupStaleSessions = () => {
     if (now - timestamp > SESSION_TIMEOUT) {
       // Session is stale - clean it up
       activeConnections.delete(sessionId);
+      sessionServers.delete(sessionId);
       sessionClientInfo.delete(sessionId);
       sessionTimestamps.delete(sessionId);
       cleanedCount++;
@@ -343,18 +357,9 @@ const cleanupStaleSessions = () => {
     }
   }
 
-  // Clean up old recent client entries
-  let recentCleaned = 0;
-  for (const [clientKey, { timestamp }] of recentClients) {
-    if (now - timestamp > RECENT_CLIENT_TTL) {
-      recentClients.delete(clientKey);
-      recentCleaned++;
-    }
-  }
-
-  if (cleanedCount > 0 || recentCleaned > 0) {
-    console.log(`${BLUE}🧹 Memory cleanup: ${cleanedCount} stale sessions, ${recentCleaned} recent clients${NC}`);
-    console.log(`${BLUE}   Memory usage: ${sessionClientInfo.size} sessions, ${recentClients.size} recent clients${NC}`);
+  if (cleanedCount > 0) {
+    console.log(`${BLUE}🧹 Memory cleanup: ${cleanedCount} stale sessions${NC}`);
+    console.log(`${BLUE}   Active sessions: ${activeConnections.size} | Total servers: ${sessionServers.size}${NC}`);
   }
 };
 
