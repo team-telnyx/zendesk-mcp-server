@@ -31,6 +31,10 @@ COPY src/ ./src/
 COPY CLAUDE.md ./
 COPY README.md ./
 
+# Copy and set up entrypoint script
+COPY docker/docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
 # Create non-root user for security with home directory
 RUN groupadd -r mcpserver && useradd -r -g mcpserver -m -d /home/mcpserver mcpserver
 RUN chown -R mcpserver:mcpserver /app
@@ -48,5 +52,6 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD curl -f http://localhost:3000/health || exit 1
 
-# Start the HTTP server
+# Set entrypoint and start the HTTP server
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 CMD ["npm", "run", "start:http"]
