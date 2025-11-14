@@ -265,13 +265,25 @@ app.all('/mcp', authenticateRequest, async (req, res) => {
   const startTime = Date.now();
   
   // Parse JSON body if it's a buffer (from express.raw)
+  // The transport needs the body to be available, so we parse it here
   let parsedBody = req.body;
   if (Buffer.isBuffer(req.body)) {
     try {
-      parsedBody = JSON.parse(req.body.toString());
+      const bodyStr = req.body.toString('utf8');
+      if (bodyStr && bodyStr.trim()) {
+        parsedBody = JSON.parse(bodyStr);
+      } else {
+        // Empty body - set to undefined so transport can handle it
+        parsedBody = undefined;
+      }
     } catch (e) {
-      parsedBody = {};
+      // Invalid JSON - log but let transport handle the error
+      console.error(`${YELLOW}⚠️  Failed to parse JSON body: ${e.message}${NC}`);
+      parsedBody = undefined;
     }
+  } else if (!parsedBody || (typeof parsedBody === 'object' && Object.keys(parsedBody).length === 0)) {
+    // Empty or undefined body
+    parsedBody = undefined;
   }
   
   // Generate or get session ID from headers
@@ -280,8 +292,23 @@ app.all('/mcp', authenticateRequest, async (req, res) => {
   console.log(`${BLUE}🔍 MCP Request Details:${NC}`);
   console.log(`${BLUE}   Session ID: ${sessionId}${NC}`);
   console.log(`${BLUE}   Method: ${req.method}${NC}`);
-  console.log(`${BLUE}   MCP Method: ${parsedBody?.method}${NC}`);
+  console.log(`${BLUE}   MCP Method: ${parsedBody?.method || 'N/A'}${NC}`);
   console.log(`${BLUE}   Client: ${clientInfo.ip}${NC}`);
+  console.log(`${BLUE}   Body: ${parsedBody ? JSON.stringify(parsedBody).substring(0, 100) : 'empty'}`);
+  console.log(`${BLUE}   Content-Type: ${req.get('Content-Type') || 'N/A'}${NC}`);
+  console.log(`${BLUE}   Content-Length: ${req.get('Content-Length') || '0'}${NC}`);
+  
+  // MCP protocol requires POST requests with JSON-RPC bodies
+  // GET requests are not part of the MCP protocol
+  if (req.method === 'GET') {
+    console.log(`${YELLOW}⚠️  GET request received - MCP protocol requires POST with JSON-RPC body${NC}`);
+    return res.status(405).json({
+      error: 'Method Not Allowed',
+      message: 'MCP protocol requires POST requests with JSON-RPC bodies. Use POST with method "resources/list" to list resources.',
+      allowedMethods: ['POST'],
+      timestamp: new Date().toISOString()
+    });
+  }
   
   try {
     // Get or create server instance for this session
@@ -311,6 +338,8 @@ app.all('/mcp', authenticateRequest, async (req, res) => {
     }
     
     // Handle the request with the session-specific transport
+    // Pass the parsed body (or undefined if empty) - the transport will handle MCP protocol
+    // Note: MCP protocol typically uses POST with JSON-RPC bodies, but transport handles both
     await sessionData.transport.handleRequest(req, res, parsedBody);
     
     const duration = Date.now() - startTime;
@@ -327,10 +356,14 @@ app.all('/mcp', authenticateRequest, async (req, res) => {
     console.error(`${RED}   Error Type: ${errorType}${NC}`);
     console.error(`${RED}   Error Message: ${errorMsg}${NC}`);
     console.error(`${RED}   Method: ${req.method} ${req.url}${NC}`);
+    console.error(`${RED}   Stack: ${error.stack?.split('\n').slice(0, 3).join('\n')}${NC}`);
     
     if (!res.headersSent) {
-      res.status(500).json({ 
-        error: 'Internal server error',
+      // Return 400 for client errors, 500 for server errors
+      const statusCode = errorMsg.includes('400') || errorMsg.includes('Bad Request') ? 400 : 500;
+      res.status(statusCode).json({ 
+        error: 'MCP request failed',
+        message: errorMsg,
         timestamp: new Date().toISOString(),
         requestId: randomUUID()
       });

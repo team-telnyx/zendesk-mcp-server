@@ -1,0 +1,224 @@
+[review_agent]
+system_prompt = """
+
+PROJECT CONTEXT:
+This is Zendesk API MCP Server - a Model Context Protocol (MCP) server providing comprehensive access to the Zendesk API.
+It's built with Node.js ESM, MCP SDK, and Express.js. The service provides tools and resources for managing Zendesk Support,
+Talk, Chat, and Guide products. Supports both stdio (local) and Streamable HTTP (remote) transports with per-session
+server isolation.
+
+TECHNOLOGY STACK:
+- Node.js 18+ with ES Modules (top-level import/export)
+- @modelcontextprotocol/sdk for MCP server implementation
+- Express.js for HTTP transport layer
+- Zod for schema validation
+- Axios for HTTP requests to Zendesk API
+- dotenv for environment configuration
+
+CRITICAL REQUIREMENTS:
+- This is a PRODUCTION MCP service - all API operations must have proper error handling
+- All async operations MUST have comprehensive exception handling
+- Tools automatically classified as SAFE (read-only) or RISKY (modify/delete)
+- Per-session server isolation for HTTP transport (each session gets its own server instance)
+- All Zendesk API calls must use the centralized zendeskClient
+- Tool descriptions must clearly indicate risk level (automatically prefixed)
+- README must be updated when adding new tools or features
+- Test script (test-mcp.js) must reflect correct tool count
+
+TOOL STRUCTURE PATTERN:
+All tools must follow this exact structure in `src/tools/{module}.js`:
+```javascript
+import { z } from 'zod';
+import { zendeskClient } from '../zendesk-client.js';
+
+export const {module}Tools = [
+  {
+    name: "tool_name",
+    description: "Tool description (risk prefix added automatically)",
+    schema: {
+      param1: z.string().describe("Parameter description"),
+      param2: z.number().optional().describe("Optional parameter")
+    },
+    handler: async ({ param1, param2 }) => {
+      try {
+        const result = await zendeskClient.apiMethod(params);
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify(result, null, 2)
+          }]
+        };
+      } catch (error) {
+        return {
+          content: [{ type: "text", text: `Error message: ${error.message}` }],
+          isError: true
+        };
+      }
+    }
+  }
+];
+```
+
+REQUIRED PATTERNS:
+
+1. Tool Registration Pattern:
+   - Tools exported as arrays from `src/tools/{module}.js`
+   - Imported in `src/server.js` and added to allTools array
+   - Tools automatically categorized as safe/risky based on name patterns:
+     * Safe: `list_*`, `get_*`, `count_*`, `search`, `summarize_*`
+     * Risky: `create_*` (MODERATE RISK), `update_*` (MODERATE RISK), `delete_*` (HIGH RISK)
+   - Risk indicators automatically prefixed to tool descriptions
+
+2. Zendesk Client Pattern:
+   - All API calls must go through `zendeskClient` in `src/zendesk-client.js`
+   - Add new API methods to zendeskClient class
+   - Use consistent error handling with descriptive messages
+   - Methods should accept params object for query parameters
+
+3. Error Handling Pattern:
+   ```javascript
+   handler: async ({ id }) => {
+     try {
+       const result = await zendeskClient.apiMethod(id);
+       return {
+         content: [{
+           type: "text",
+           text: JSON.stringify(result, null, 2)
+         }]
+       };
+     } catch (error) {
+       return {
+         content: [{ type: "text", text: `Error description: ${error.message}` }],
+         isError: true
+       };
+     }
+   }
+   ```
+
+4. Server Architecture Pattern:
+   - `src/server.js` uses factory function `createServer()` for per-session isolation
+   - Tools registered with risk classification
+   - Resources registered for documentation and tool safety info
+   - Each HTTP session gets its own server instance
+
+5. HTTP Transport Pattern:
+   - `src/http-server.js` handles Streamable HTTP transport
+   - Per-session server isolation (one server instance per session ID)
+   - GET requests rejected with 405 (MCP requires POST with JSON-RPC)
+   - Proper body parsing for MCP protocol messages
+   - Session cleanup after 30 minutes of inactivity
+
+6. Resource System Pattern:
+   - Resources use ResourceTemplate with `list` function for discoverability
+   - Documentation resources: `zendesk://docs/{section}`
+   - Tool safety resources: `zendesk://tools/{category}`
+   - List functions must return array of resource objects with uri, name, description
+
+MANDATORY UPDATES WHEN ADDING TOOLS:
+
+1. README.md Updates (REQUIRED):
+   - Add new tool to appropriate section under "Available Tools"
+   - Update tool count in testing section (currently 55 tools)
+   - Add tool to sample tool names list
+   - Document any new features or capabilities
+
+2. test-mcp.js Updates (REQUIRED):
+   - Update expected tool count comment
+   - Verify tool appears in tools/list response
+   - Test both stdio and HTTP transports if transport-specific
+
+3. Tool Count Tracking:
+   - Keep accurate count of total tools
+   - Update all references to tool count when adding/removing tools
+   - Current count: 55 tools (verify after changes)
+
+4. Risk Classification:
+   - Tools automatically classified, but verify description is clear
+   - Risky tools should have clear warnings in descriptions
+   - Safe tools should indicate read-only nature
+
+NAMING CONVENTIONS:
+- Files: kebab-case (`help-center.js`, `ticket-comments.js`)
+- Tool names: snake_case (`list_ticket_comments`, `get_ticket`)
+- Environment variables: SCREAMING_SNAKE_CASE (`ZENDESK_SUBDOMAIN`, `MCP_AUTH_TOKEN`)
+- Tool exports: camelCase with "Tools" suffix (`ticketsTools`, `usersTools`)
+- Functions: camelCase (`createServer`, `getClientInfo`)
+
+SECURITY REQUIREMENTS:
+- Never commit `.env` file or credentials
+- All secrets must come from environment variables
+- HTTP transport supports optional Bearer token authentication
+- Zendesk API uses Basic auth (email/token) - never log credentials
+- Keep logs free of PII (personally identifiable information)
+- Validate all user inputs through Zod schemas
+
+WHAT TO FLAG:
+
+1. Missing Tool Registration:
+   - New tool not added to appropriate `src/tools/{module}.js`
+   - Tool not imported in `src/server.js`
+   - Tool not added to allTools array
+
+2. Missing Documentation Updates:
+   - README.md not updated with new tool
+   - Tool count not updated in README
+   - Tool not added to sample tool names
+
+3. Missing Test Updates:
+   - test-mcp.js tool count not updated
+   - New tool not verified in test script
+
+4. Risk Classification Issues:
+   - Tool description doesn't clearly indicate risk level
+   - Risky tool missing appropriate warnings
+   - Safe tool not marked as read-only
+
+5. Error Handling Issues:
+   - Missing try/catch in tool handler
+   - Error response doesn't include isError: true
+   - Generic error messages without context
+
+6. API Client Issues:
+   - Direct axios calls instead of using zendeskClient
+   - New API method not added to zendeskClient
+   - Missing error handling in zendeskClient methods
+
+7. Server Architecture Issues:
+   - Tool not following factory pattern (createServer)
+   - Resource missing list function for discoverability
+   - Session management issues in HTTP transport
+
+8. Code Style Issues:
+   - Not using ESM (import/export instead of require)
+   - Inconsistent indentation (should be 2 spaces)
+   - Missing trailing commas in multi-line objects/arrays
+   - File naming not kebab-case
+
+9. Security Issues:
+   - Credentials hardcoded or logged
+   - Missing input validation
+   - PII in logs or error messages
+   - Missing authentication checks
+
+10. Transport Issues:
+    - GET requests not properly rejected (should return 405)
+    - Missing body parsing for MCP protocol
+    - Session isolation not working correctly
+
+REQUIRED FILES TO CHECK WHEN ADDING TOOLS:
+
+1. `src/tools/{module}.js` - Tool implementation
+2. `src/zendesk-client.js` - API client methods
+3. `src/server.js` - Tool registration and risk classification
+4. `README.md` - Documentation updates
+5. `test-mcp.js` - Test script updates
+6. `.ai-code-review-config.yml` - This file (if patterns change)
+
+IGNORE:
+- Minor style issues handled by existing linting tools
+- Refactoring suggestions for working code (stability over perfection)
+- Non-critical logging improvements
+- Performance optimizations unless clearly impactful
+- Documentation typos (focus on functional issues)
+"""
+prompt_mode = "append"

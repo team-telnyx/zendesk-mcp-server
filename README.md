@@ -34,8 +34,15 @@ A comprehensive Model Context Protocol (MCP) server for interacting with the Zen
 
 ### Running the Server
 
-#### Local Development (stdio transport)
-Start the server:
+This server supports two transport methods:
+
+#### 1. Stdio Transport (Local Development)
+The stdio transport communicates via stdin/stdout pipes and **does not use a network port**. This is ideal for:
+- Local development with MCP Inspector
+- Claude Desktop when configured for stdio transport
+- Direct process-to-process communication
+
+Start the stdio server:
 ```
 npm start
 ```
@@ -45,8 +52,22 @@ For development with auto-restart:
 npm run dev
 ```
 
-#### Remote Deployment (Streamable HTTP transport)
-Start the Streamable HTTP server for remote access:
+**Expected output:**
+```
+Starting Zendesk API MCP server...
+✅ Zendesk MCP server ready and waiting for connections (stdio transport)
+```
+
+The server will then wait for MCP protocol messages on stdin. This is normal behavior - the server is ready and waiting for connections.
+
+#### 2. Streamable HTTP Transport (Remote Deployment)
+The HTTP transport runs a web server on a network port, ideal for:
+- Remote deployments
+- Kubernetes/Docker environments
+- Multiple clients connecting simultaneously
+- Production environments
+
+Start the HTTP server:
 ```
 npm run start:http
 ```
@@ -56,7 +77,19 @@ For development with auto-restart:
 npm run dev:http
 ```
 
-The server will run on port 3000 (or PORT env variable) with:
+**Expected output:**
+```
+🚀 Zendesk MCP Server running on http (port 3000)
+Environment: local
+Authentication: Enabled (Bearer token required)
+Client logging: Enhanced with IP tracking and error monitoring
+Streamable HTTP MCP: http://localhost:3000/mcp
+Health Check: http://localhost:3000/health
+Connections: http://localhost:3000/connections
+Metrics: http://localhost:3000/metrics
+```
+
+The HTTP server runs on **port 3000** by default (or the value of the `PORT` environment variable) with:
 - Streamable HTTP MCP endpoint: `http://localhost:3000/mcp`
 - Health check: `http://localhost:3000/health`
 - Connection monitoring: `http://localhost:3000/connections`
@@ -68,7 +101,7 @@ This repository includes a comprehensive test script to verify that MCP tools ar
 
 #### Test Stdio Transport (Local Development)
 ```bash
-# Test the stdio transport with 49 Zendesk API tools
+# Test the stdio transport with 53 Zendesk API tools
 node test-mcp.js
 ```
 
@@ -89,9 +122,9 @@ npm run inspect
 
 The test script will verify:
 - ✅ Server connectivity via both transports
-- ✅ Tool discovery (should find 49 tools)
+- ✅ Tool discovery (should find 53 tools)
 - ✅ Basic MCP protocol functionality
-- 🔍 Sample tool names: `list_tickets`, `get_ticket`, `create_ticket`, `update_ticket`, `delete_ticket`, ...
+- 🔍 Sample tool names: `list_tickets`, `get_ticket`, `list_ticket_comments`, `summarize_ticket_comments`, `count_ticket_comments`, `get_ticket_comment`, `create_ticket`, `update_ticket`, `delete_ticket`, ...
 
 ## Remote Deployment
 
@@ -134,6 +167,10 @@ To connect to the remote MCP server from Claude Code:
 ### Tickets
 - `list_tickets`: List tickets in Zendesk
 - `get_ticket`: Get a specific ticket by ID
+- `list_ticket_comments`: List all comments (public and private) for a specific ticket with pagination support. **Output clearly shows 🔓 PUBLIC or 🔒 PRIVATE for each comment.** Supports `page`, `per_page`, `sort_order` parameters.
+- `summarize_ticket_comments`: **Automatically fetches ALL comments across multiple pages** and provides a summary showing public vs private breakdown **and customer vs agent identification**. Fetches author role information to identify which comments are from customers vs support agents. Best tool for AI agents to get complete comment context without truncation.
+- `count_ticket_comments`: Get the count of comments (public and private) for a specific ticket
+- `get_ticket_comment`: Get a specific comment by ID from a ticket. **Clearly shows if comment is public or private.**
 - `create_ticket`: Create a new ticket
 - `update_ticket`: Update an existing ticket
 - `delete_ticket`: Delete a ticket
@@ -203,9 +240,41 @@ To connect to the remote MCP server from Claude Code:
 ### Chat
 - `list_chats`: List Zendesk Chat conversations
 
+### Support
+- `list_risky_tools`: **List all risky tools that can modify or delete data.** Use this to identify which tools require caution. Supports filtering by risk level (all, high_risk, moderate_risk).
+- `list_safe_tools`: **List all safe (read-only) tools** that only fetch, list, or read information without modifying data.
+- `support_info`: Get information about Zendesk Support configuration
+
 ## Available Resources
 
 - `zendesk://docs/{section}`: Access documentation for different sections of the Zendesk API
+- `zendesk://tools/{category}`: Access tool safety information
+  - `zendesk://tools/summary`: Get a summary of safe vs risky tools
+  - `zendesk://tools/risky`: List all risky tools (create, update, delete operations)
+  - `zendesk://tools/safe`: List all safe tools (read-only operations)
+  - `zendesk://tools/all`: List all risky tools
+
+## Tool Safety Classification
+
+All tools are automatically classified and labeled:
+
+- **✅ SAFE (Read-only)**: Tools that only fetch, list, or read information. These tools have no risk of modifying data.
+  - Examples: `list_tickets`, `get_ticket`, `list_ticket_comments`, `search`, etc.
+  - Tool descriptions are prefixed with: `✅ SAFE (Read-only):`
+
+- **⚠️ MODERATE RISK**: Tools that create or update data in Zendesk.
+  - Examples: `create_ticket`, `update_ticket`, `create_user`, `update_organization`, etc.
+  - Tool descriptions are prefixed with: `⚠️ MODERATE RISK:`
+
+- **⚠️ HIGH RISK**: Tools that delete data in Zendesk.
+  - Examples: `delete_ticket`, `delete_user`, `delete_organization`, etc.
+  - Tool descriptions are prefixed with: `⚠️ HIGH RISK:`
+
+**For AI Agents**: 
+- **Use `list_risky_tools` tool** to see all risky tools before executing any operations
+- **Use `list_safe_tools` tool** to see all safe read-only tools
+- Check tool descriptions which are prefixed with risk indicators (✅ SAFE, ⚠️ MODERATE RISK, ⚠️ HIGH RISK)
+- Access `zendesk://tools/summary` resource to see a complete breakdown of safe vs risky tools
 
 ## Connection Monitoring
 
