@@ -533,7 +533,7 @@ export const ticketsTools = [
       tags: z.array(z.string()).optional().describe("Updated tags for the ticket"),
       custom_fields: z.array(z.object({
         id: z.union([z.number(), z.string()]).describe("Custom field ID"),
-        value: z.union([z.string(), z.number(), z.boolean(), z.null()]).describe("Value to set for the custom field")
+        value: z.union([z.string(), z.number(), z.boolean(), z.array(z.string()), z.null()]).describe("Value to set for the custom field")
       })).optional().describe("Array of custom fields to update")
     },
     handler: async ({ id, subject, comment, priority, status, assignee_id, group_id, type, tags, custom_fields }) => {
