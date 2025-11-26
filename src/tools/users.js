@@ -4,10 +4,10 @@ import { z } from 'zod';
     export const usersTools = [
       {
         name: "list_users",
-        description: "List users in Zendesk",
+        description: "List users with pagination support. Returns first page only (default: up to 100 users). Use get_user if you have a specific user ID. Supports filtering by role (end-user, agent, admin). WARNING: May return large datasets - use pagination parameters (page, per_page) to limit results.",
         schema: {
-          page: z.number().optional().describe("Page number for pagination"),
-          per_page: z.number().optional().describe("Number of users per page (max 100)"),
+          page: z.number().int().optional().describe("Page number for pagination"),
+          per_page: z.number().int().optional().describe("Number of users per page (max 100)"),
           role: z.enum(["end-user", "agent", "admin"]).optional().describe("Filter users by role")
         },
         handler: async ({ page, per_page, role }) => {
@@ -30,9 +30,9 @@ import { z } from 'zod';
       },
       {
         name: "get_user",
-        description: "Get a specific user by ID",
+        description: "Get a specific user by ID. PREFERRED over list_users when you have the user ID. Returns complete user details including name, email, role, and organization.",
         schema: {
-          id: z.number().describe("User ID")
+          id: z.number().int().describe("User ID")
         },
         handler: async ({ id }) => {
           try {
@@ -53,13 +53,13 @@ import { z } from 'zod';
       },
       {
         name: "create_user",
-        description: "Create a new user",
+        description: "Create a new user in Zendesk. MODERATE RISK: This will create new data. Requires name and email. Returns the created user with its ID.",
         schema: {
           name: z.string().describe("User's full name"),
           email: z.string().email().describe("User's email address"),
           role: z.enum(["end-user", "agent", "admin"]).optional().describe("User's role"),
           phone: z.string().optional().describe("User's phone number"),
-          organization_id: z.number().optional().describe("ID of the user's organization"),
+          organization_id: z.number().int().optional().describe("ID of the user's organization"),
           tags: z.array(z.string()).optional().describe("Tags for the user"),
           notes: z.string().optional().describe("Notes about the user")
         },
@@ -92,14 +92,14 @@ import { z } from 'zod';
       },
       {
         name: "update_user",
-        description: "Update an existing user",
+        description: "Update an existing user by ID. MODERATE RISK: This will modify existing data. Supports updating name, email, role, phone, organization, tags, and notes. Returns the updated user.",
         schema: {
-          id: z.number().describe("User ID to update"),
+          id: z.number().int().describe("User ID to update"),
           name: z.string().optional().describe("Updated user's name"),
           email: z.string().email().optional().describe("Updated email address"),
           role: z.enum(["end-user", "agent", "admin"]).optional().describe("Updated user's role"),
           phone: z.string().optional().describe("Updated phone number"),
-          organization_id: z.number().optional().describe("Updated organization ID"),
+          organization_id: z.number().int().optional().describe("Updated organization ID"),
           tags: z.array(z.string()).optional().describe("Updated tags for the user"),
           notes: z.string().optional().describe("Updated notes about the user")
         },
@@ -137,7 +137,7 @@ import { z } from 'zod';
         name: "delete_user",
         description: "Delete a user",
         schema: {
-          id: z.number().describe("User ID to delete")
+          id: z.number().int().describe("User ID to delete")
         },
         handler: async ({ id }) => {
           try {

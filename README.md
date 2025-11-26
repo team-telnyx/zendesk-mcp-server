@@ -97,7 +97,11 @@ The HTTP server runs on **port 3000** by default (or the value of the `PORT` env
 
 ### Testing MCP Server
 
-This repository includes a comprehensive test script to verify that MCP tools are accessible through both transport methods.
+This repository includes comprehensive test scripts to verify MCP tools and schema compatibility.
+
+### Testing Tool Accessibility
+
+The `test-mcp.js` script verifies that MCP tools are accessible through both transport methods.
 
 #### Test Stdio Transport (Local Development)
 ```bash
@@ -142,6 +146,27 @@ git push origin main
 # Deploy to production environment
 # (requires approval and proper CI/CD process)
 ```
+
+### Verifying Production Schemas
+
+To verify that tool schemas in production have `additionalProperties: false` (required for newer OpenAI models):
+
+```bash
+# Set authentication token
+export MCP_AUTH_TOKEN=your_production_token
+
+# Run verification script
+node verify-production-schemas.js
+
+# Or specify custom URL
+node verify-production-schemas.js http://zendesk-mcp-server.query.prod.telnyx.io:3000/mcp
+```
+
+The script will:
+- Connect to the production MCP server
+- Check representative tools for `additionalProperties: false`
+- Verify both root and nested objects
+- Output a detailed report suitable for sharing with engineers
 
 ### Docker
 

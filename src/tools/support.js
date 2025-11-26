@@ -52,7 +52,7 @@ function getAllToolsExcludingMeta() {
 export const supportTools = [
   {
     name: "list_risky_tools",
-    description: "List all risky tools that can modify or delete data in Zendesk. Use this to identify which tools require caution before use.",
+    description: "List all risky tools that can modify or delete data in Zendesk. Use this to identify which tools require caution before use. Returns tools categorized by risk level (HIGH RISK for delete operations, MODERATE RISK for create/update operations). Use category parameter: 'all' (default) returns all risky tools grouped by level, 'high_risk' returns only delete operations, 'moderate_risk' returns only create/update operations.",
     schema: {
       category: z.enum(["all", "high_risk", "moderate_risk"]).optional().describe("Filter by risk level: all (default), high_risk (delete operations), or moderate_risk (create/update operations)")
     },
@@ -140,7 +140,7 @@ export const supportTools = [
   },
   {
     name: "list_safe_tools",
-    description: "List all safe (read-only) tools that only fetch, list, or read information without modifying data.",
+    description: "List all safe (read-only) tools that only fetch, list, or read information without modifying data. Use this to identify tools that are safe to use without risk of data modification. All listed tools are prefixed with '✅ SAFE (Read-only):' in their descriptions.",
     schema: {},
     handler: async () => {
       try {
@@ -182,7 +182,7 @@ export const supportTools = [
   },
   {
     name: "support_info",
-    description: "Get information about Zendesk Support configuration",
+    description: "Get information about Zendesk Support configuration. Returns system-level Support settings and configuration details. This is a read-only operation.",
     schema: {},
     handler: async () => {
       try {

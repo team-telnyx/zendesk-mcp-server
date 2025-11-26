@@ -2,9 +2,26 @@
 import express from 'express';
 import { randomUUID } from 'node:crypto';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import { createServer } from './server.js';
+import { createServer, getToolRiskInfo } from './server.js';
 import dotenv from 'dotenv';
 import morgan from 'morgan';
+import { z } from 'zod';
+import { ticketsTools } from './tools/tickets.js';
+import { usersTools } from './tools/users.js';
+import { organizationsTools } from './tools/organizations.js';
+import { groupsTools } from './tools/groups.js';
+import { macrosTools } from './tools/macros.js';
+import { viewsTools } from './tools/views.js';
+import { triggersTools } from './tools/triggers.js';
+import { automationsTools } from './tools/automations.js';
+import { searchTools } from './tools/search.js';
+import { helpCenterTools } from './tools/help-center.js';
+import { supportTools } from './tools/support.js';
+import { talkTools } from './tools/talk.js';
+import { chatTools } from './tools/chat.js';
+
+// Import zod-to-json-schema (available as transitive dependency via SDK)
+import { zodToJsonSchema } from 'zod-to-json-schema';
 
 // Load environment variables
 dotenv.config();
@@ -91,9 +108,9 @@ morgan.token('colored-method', (req) => {
 
 // Enhanced logging format with client info
 morgan.token('client-ip', (req) => {
-  return req.ip || req.connection.remoteAddress || req.socket.remoteAddress || 
-         (req.connection.socket ? req.connection.socket.remoteAddress : null) ||
-         req.headers['x-forwarded-for']?.split(',')[0];
+  return req.ip || req.connection.remoteAddress || req.socket.remoteAddress ||
+    (req.connection.socket ? req.connection.socket.remoteAddress : null) ||
+    req.headers['x-forwarded-for']?.split(',')[0];
 });
 
 morgan.token('user-agent', (req) => {
@@ -105,8 +122,8 @@ app.use(morgan(`[:date[iso]] :client-ip ":user-agent" :colored-method :url :colo
 
 // Health check endpoint
 app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'healthy', 
+  res.json({
+    status: 'healthy',
     service: 'zendesk-mcp-server',
     environment,
     timestamp: new Date().toISOString()
@@ -130,17 +147,150 @@ zendesk_mcp_server_total_connections ${connectionCounter}
 `);
 });
 
+// Tools listing endpoint - returns all tools with their schemas
+app.get('/tools', (req, res) => {
+  try {
+    // Collect all tools
+    const allTools = [
+      ...ticketsTools,
+      ...usersTools,
+      ...organizationsTools,
+      ...groupsTools,
+      ...macrosTools,
+      ...viewsTools,
+      ...triggersTools,
+      ...automationsTools,
+      ...searchTools,
+      ...helpCenterTools,
+      ...supportTools,
+      ...talkTools,
+      ...chatTools
+    ];
+
+    // Convert tools to API format and collect errors
+    const schemaErrors = [];
+    const toolsList = allTools.map(tool => {
+      const riskInfo = getToolRiskInfo(tool.name, tool.description);
+      const enhancedDescription = `${riskInfo.prefix}${tool.description}`;
+
+      // Convert Zod schema to JSON Schema
+      let jsonSchema = null;
+      if (tool.schema && Object.keys(tool.schema).length > 0) {
+        try {
+          // Validate that all schema values are Zod types
+          const invalidFields = Object.entries(tool.schema)
+            .filter(([_, value]) => !value || typeof value._parse !== 'function')
+            .map(([key]) => key);
+
+          if (invalidFields.length > 0) {
+            throw new Error(`Invalid schema definition for tool "${tool.name}": fields ${invalidFields.join(', ')} are not valid Zod types. All schema values must be Zod schema instances.`);
+          }
+
+          // Convert Zod schema object to z.object
+          const zodObject = z.object(tool.schema);
+          jsonSchema = zodToJsonSchema(zodObject, {
+            target: 'openApi3',
+            $refStrategy: 'none',
+            strictUnions: true
+          });
+          // Recursively ensure additionalProperties: false is set on all nested objects
+          const setAdditionalProperties = (schema) => {
+            if (schema && typeof schema === 'object' && !Array.isArray(schema)) {
+              if (schema.type === 'object' || schema.properties) {
+                schema.additionalProperties = false;
+                if (schema.properties) {
+                  for (const prop of Object.values(schema.properties)) {
+                    setAdditionalProperties(prop);
+                  }
+                }
+              }
+              // Handle array items
+              if (schema.items) {
+                setAdditionalProperties(schema.items);
+              }
+              // Handle anyOf/oneOf/allOf
+              ['anyOf', 'oneOf', 'allOf'].forEach(key => {
+                if (schema[key] && Array.isArray(schema[key])) {
+                  schema[key].forEach(item => setAdditionalProperties(item));
+                }
+              });
+            }
+          };
+          setAdditionalProperties(jsonSchema);
+        } catch (error) {
+          // Collect error instead of silently failing
+          schemaErrors.push({
+            tool: tool.name,
+            error: error.message,
+            stack: error.stack
+          });
+          // Don't set jsonSchema - will be handled below
+        }
+      } else {
+        jsonSchema = {
+          type: 'object',
+          properties: {},
+          additionalProperties: false
+        };
+      }
+
+      // If schema conversion failed, don't include this tool
+      if (!jsonSchema) {
+        return null;
+      }
+
+      return {
+        name: tool.name,
+        description: enhancedDescription,
+        baseDescription: tool.description,
+        riskLevel: riskInfo.riskLevel,
+        isRisky: riskInfo.isRisky,
+        schema: jsonSchema
+      };
+    }).filter(tool => tool !== null); // Remove tools with failed schema conversion
+
+    // If any schema conversions failed, return 500 with error details
+    if (schemaErrors.length > 0) {
+      console.error(`❌ Schema conversion failed for ${schemaErrors.length} tool(s):`);
+      schemaErrors.forEach(err => {
+        console.error(`   - ${err.tool}: ${err.error}`);
+      });
+      return res.status(500).json({
+        error: 'Schema conversion failed',
+        message: `Failed to convert schemas for ${schemaErrors.length} tool(s)`,
+        failedTools: schemaErrors.map(e => ({ tool: e.tool, error: e.error })),
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    res.json({
+      service: 'zendesk-mcp-server',
+      version: '1.0.0',
+      total: toolsList.length,
+      tools: toolsList,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('❌ Fatal error in /tools endpoint:', error);
+    res.status(500).json({
+      error: 'Failed to list tools',
+      message: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 // Connections status endpoint
 app.get('/connections', (req, res) => {
   const now = Date.now();
   const uptimeMs = now - serverStartTime;
-  
+
   const activeSessions = Array.from(activeConnections).map(sessionId => {
     const clientInfo = sessionClientInfo.get(sessionId);
     const startTime = sessionTimestamps.get(sessionId);
     const duration = startTime ? now - startTime : 0;
     const hasServerInstance = sessionServers.has(sessionId);
-    
+
     return {
       sessionId,
       ip: clientInfo?.ip || 'unknown',
@@ -198,7 +348,7 @@ const authenticateRequest = (req, res, next) => {
   }
 
   const authHeader = req.headers.authorization;
-  
+
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({
       error: 'Unauthorized',
@@ -208,7 +358,7 @@ const authenticateRequest = (req, res, next) => {
   }
 
   const token = authHeader.substring(7); // Remove 'Bearer ' prefix
-  
+
   if (token !== MCP_AUTH_TOKEN) {
     return res.status(401).json({
       error: 'Unauthorized',
@@ -222,9 +372,9 @@ const authenticateRequest = (req, res, next) => {
 
 // Helper to get client info from request
 const getClientInfo = (req) => {
-  const ip = req.ip || req.connection.remoteAddress || req.socket.remoteAddress || 
-             (req.connection.socket ? req.connection.socket.remoteAddress : null) ||
-             req.headers['x-forwarded-for']?.split(',')[0] || 'unknown';
+  const ip = req.ip || req.connection.remoteAddress || req.socket.remoteAddress ||
+    (req.connection.socket ? req.connection.socket.remoteAddress : null) ||
+    req.headers['x-forwarded-for']?.split(',')[0] || 'unknown';
   const userAgent = req.get('User-Agent') || 'unknown';
   const host = req.get('Host') || 'unknown';
   return { ip, userAgent, host };
@@ -243,19 +393,19 @@ function createSessionTransport(sessionId) {
       const clientInfo = sessionClientInfo.get(actualSessionId);
       const startTime = sessionTimestamps.get(actualSessionId);
       const duration = startTime ? Date.now() - startTime : 0;
-      
+
       console.log(`${YELLOW}🔌 MCP session closed: ${actualSessionId} - Duration: ${Math.floor(duration / 1000)}s${NC}`);
-      
+
       // Cleanup session data
       activeConnections.delete(actualSessionId);
       sessionServers.delete(actualSessionId);
       sessionClientInfo.delete(actualSessionId);
       sessionTimestamps.delete(actualSessionId);
-      
+
       console.log(`${BLUE}   Active sessions: ${activeConnections.size}${NC}`);
     }
   });
-  
+
   return transport;
 }
 
@@ -263,7 +413,7 @@ function createSessionTransport(sessionId) {
 app.all('/mcp', authenticateRequest, async (req, res) => {
   const clientInfo = getClientInfo(req);
   const startTime = Date.now();
-  
+
   // Parse JSON body if it's a buffer (from express.raw)
   // The transport needs the body to be available, so we parse it here
   let parsedBody = req.body;
@@ -285,10 +435,10 @@ app.all('/mcp', authenticateRequest, async (req, res) => {
     // Empty or undefined body
     parsedBody = undefined;
   }
-  
+
   // Generate or get session ID from headers
   let sessionId = req.headers['mcp-session-id'] || randomUUID();
-  
+
   console.log(`${BLUE}🔍 MCP Request Details:${NC}`);
   console.log(`${BLUE}   Session ID: ${sessionId}${NC}`);
   console.log(`${BLUE}   Method: ${req.method}${NC}`);
@@ -297,7 +447,7 @@ app.all('/mcp', authenticateRequest, async (req, res) => {
   console.log(`${BLUE}   Body: ${parsedBody ? JSON.stringify(parsedBody).substring(0, 100) : 'empty'}`);
   console.log(`${BLUE}   Content-Type: ${req.get('Content-Type') || 'N/A'}${NC}`);
   console.log(`${BLUE}   Content-Length: ${req.get('Content-Length') || '0'}${NC}`);
-  
+
   // MCP protocol requires POST requests with JSON-RPC bodies
   // GET requests are not part of the MCP protocol
   if (req.method === 'GET') {
@@ -309,47 +459,47 @@ app.all('/mcp', authenticateRequest, async (req, res) => {
       timestamp: new Date().toISOString()
     });
   }
-  
+
   try {
     // Get or create server instance for this session
     let sessionData = sessionServers.get(sessionId);
-    
+
     if (!sessionData) {
       console.log(`${GREEN}🆕 Creating new server instance for session ${sessionId}${NC}`);
-      
+
       // Create new server and transport for this session
       const sessionServer = createServer();
       const sessionTransport = createSessionTransport(sessionId);
-      
+
       // Connect server to transport
       sessionServer.connect(sessionTransport);
-      
+
       // Store session data
       sessionData = { server: sessionServer, transport: sessionTransport };
       sessionServers.set(sessionId, sessionData);
       sessionClientInfo.set(sessionId, clientInfo);
       sessionTimestamps.set(sessionId, startTime);
-      
+
       connectionCounter++;
       console.log(`${BLUE}   Client: ${clientInfo.ip} | ${clientInfo.userAgent}${NC}`);
       console.log(`${BLUE}   Active sessions: ${sessionServers.size}${NC}`);
     } else {
       console.log(`${BLUE}♻️  Using existing server instance for session ${sessionId}${NC}`);
     }
-    
+
     // Handle the request with the session-specific transport
     // Pass the parsed body (or undefined if empty) - the transport will handle MCP protocol
     // Note: MCP protocol typically uses POST with JSON-RPC bodies, but transport handles both
     await sessionData.transport.handleRequest(req, res, parsedBody);
-    
+
     const duration = Date.now() - startTime;
     console.log(`${GREEN}✓ MCP request completed (${duration}ms) - ${sessionId} - ${clientInfo.ip}${NC}`);
-    
+
   } catch (error) {
     const duration = Date.now() - startTime;
     const errorType = error.name || 'Unknown';
     const errorMsg = error.message || 'Unknown error';
-    
+
     console.error(`${RED}❌ MCP request failed (${duration}ms)${NC}`);
     console.error(`${RED}   Session ID: ${sessionId}${NC}`);
     console.error(`${RED}   Client: ${clientInfo.ip}${NC}`);
@@ -357,11 +507,11 @@ app.all('/mcp', authenticateRequest, async (req, res) => {
     console.error(`${RED}   Error Message: ${errorMsg}${NC}`);
     console.error(`${RED}   Method: ${req.method} ${req.url}${NC}`);
     console.error(`${RED}   Stack: ${error.stack?.split('\n').slice(0, 3).join('\n')}${NC}`);
-    
+
     if (!res.headersSent) {
       // Return 400 for client errors, 500 for server errors
       const statusCode = errorMsg.includes('400') || errorMsg.includes('Bad Request') ? 400 : 500;
-      res.status(statusCode).json({ 
+      res.status(statusCode).json({
         error: 'MCP request failed',
         message: errorMsg,
         timestamp: new Date().toISOString(),
@@ -385,7 +535,7 @@ const cleanupStaleSessions = () => {
       sessionClientInfo.delete(sessionId);
       sessionTimestamps.delete(sessionId);
       cleanedCount++;
-      
+
       console.log(`${YELLOW}🧹 Cleaned up stale session: ${sessionId} (${Math.floor((now - timestamp) / 1000)}s old)${NC}`);
     }
   }
@@ -401,7 +551,7 @@ setInterval(() => {
   // Health reporting
   if (activeConnections.size > 0) {
     console.log(`${BLUE}📊 Health Report: ${activeConnections.size} active MCP sessions | Total connections: ${connectionCounter}${NC}`);
-    
+
     // Show client info for active sessions
     for (const [sessionId, clientInfo] of sessionClientInfo) {
       if (activeConnections.has(sessionId)) {
@@ -409,29 +559,31 @@ setInterval(() => {
       }
     }
   }
-  
+
   // Memory cleanup
   cleanupStaleSessions();
 }, CLEANUP_INTERVAL);
 
 app.listen(port, () => {
   const baseUrl = getBaseUrl();
-  
+
   console.log(`${GREEN}🚀 Zendesk MCP Server running on http (port ${port})${NC}`);
   console.log(`${BLUE}Environment: ${environment}${NC}`);
   console.log(`${BLUE}Authentication: ${MCP_AUTH_TOKEN ? 'Enabled (Bearer token required)' : 'Disabled (local development)'}${NC}`);
   console.log(`${BLUE}Client logging: Enhanced with IP tracking and error monitoring${NC}`);
-  
+
   if (isLocalInstance) {
     // Local development - show localhost URLs
     console.log(`${GREEN}Streamable HTTP MCP: ${baseUrl}/mcp${NC}`);
     console.log(`${GREEN}Health Check: ${baseUrl}/health${NC}`);
+    console.log(`${GREEN}Tools API: ${baseUrl}/tools${NC}`);
     console.log(`${GREEN}Connections: ${baseUrl}/connections${NC}`);
     console.log(`${GREEN}Metrics: ${baseUrl}/metrics${NC}`);
   } else {
     // Remote environment (dev/prod) - show remote URLs
     console.log(`${GREEN}Streamable HTTP MCP: ${baseUrl}/mcp${NC}`);
     console.log(`${GREEN}Health Check: ${baseUrl}/health${NC}`);
+    console.log(`${GREEN}Tools API: ${baseUrl}/tools${NC}`);
     console.log(`${GREEN}Connections: ${baseUrl}/connections${NC}`);
     console.log(`${GREEN}Metrics: ${baseUrl}/metrics${NC}`);
   }

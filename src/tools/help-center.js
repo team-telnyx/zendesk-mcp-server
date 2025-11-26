@@ -4,10 +4,10 @@ import { z } from 'zod';
     export const helpCenterTools = [
       {
         name: "list_articles",
-        description: "List Help Center articles",
+        description: "List Help Center articles with pagination support. Returns first page only (default: up to 100 articles). Use get_article if you have the article ID. Supports sorting via sort_by and sort_order. WARNING: May return large datasets - use pagination parameters (page, per_page) to limit results.",
         schema: {
-          page: z.number().optional().describe("Page number for pagination"),
-          per_page: z.number().optional().describe("Number of articles per page (max 100)"),
+          page: z.number().int().optional().describe("Page number for pagination"),
+          per_page: z.number().int().optional().describe("Number of articles per page (max 100)"),
           sort_by: z.string().optional().describe("Field to sort by"),
           sort_order: z.enum(["asc", "desc"]).optional().describe("Sort order (asc or desc)")
         },
@@ -31,9 +31,9 @@ import { z } from 'zod';
       },
       {
         name: "get_article",
-        description: "Get a specific Help Center article by ID",
+        description: "Get a specific Help Center article by ID. PREFERRED over list_articles when you have the article ID. Returns complete article details including title, body, and metadata.",
         schema: {
-          id: z.number().describe("Article ID")
+          id: z.number().int().describe("Article ID")
         },
         handler: async ({ id }) => {
           try {
@@ -54,15 +54,15 @@ import { z } from 'zod';
       },
       {
         name: "create_article",
-        description: "Create a new Help Center article",
+        description: "Create a new Help Center article in Zendesk. MODERATE RISK: This will create new data. Requires title, body, and section_id. Returns the created article with its ID.",
         schema: {
           title: z.string().describe("Article title"),
           body: z.string().describe("Article body content (HTML)"),
-          section_id: z.number().describe("Section ID where the article will be created"),
+          section_id: z.number().int().describe("Section ID where the article will be created"),
           locale: z.string().optional().describe("Article locale (e.g., 'en-us')"),
           draft: z.boolean().optional().describe("Whether the article is a draft"),
-          permission_group_id: z.number().optional().describe("Permission group ID for the article"),
-          user_segment_id: z.number().optional().describe("User segment ID for the article"),
+          permission_group_id: z.number().int().optional().describe("Permission group ID for the article"),
+          user_segment_id: z.number().int().optional().describe("User segment ID for the article"),
           label_names: z.array(z.string()).optional().describe("Labels for the article")
         },
         handler: async ({ title, body, section_id, locale, draft, permission_group_id, user_segment_id, label_names }) => {
@@ -94,15 +94,15 @@ import { z } from 'zod';
       },
       {
         name: "update_article",
-        description: "Update an existing Help Center article",
+        description: "Update an existing Help Center article by ID. MODERATE RISK: This will modify existing data. Supports updating title, body, locale, draft status, permissions, and labels. Returns the updated article.",
         schema: {
-          id: z.number().describe("Article ID to update"),
+          id: z.number().int().describe("Article ID to update"),
           title: z.string().optional().describe("Updated article title"),
           body: z.string().optional().describe("Updated article body content (HTML)"),
           locale: z.string().optional().describe("Updated article locale (e.g., 'en-us')"),
           draft: z.boolean().optional().describe("Whether the article is a draft"),
-          permission_group_id: z.number().optional().describe("Updated permission group ID"),
-          user_segment_id: z.number().optional().describe("Updated user segment ID"),
+          permission_group_id: z.number().int().optional().describe("Updated permission group ID"),
+          user_segment_id: z.number().int().optional().describe("Updated user segment ID"),
           label_names: z.array(z.string()).optional().describe("Updated labels")
         },
         handler: async ({ id, title, body, locale, draft, permission_group_id, user_segment_id, label_names }) => {
@@ -134,9 +134,9 @@ import { z } from 'zod';
       },
       {
         name: "delete_article",
-        description: "Delete a Help Center article",
+        description: "Delete a Help Center article by ID. HIGH RISK: This permanently deletes the article and cannot be undone. Use with extreme caution.",
         schema: {
-          id: z.number().describe("Article ID to delete")
+          id: z.number().int().describe("Article ID to delete")
         },
         handler: async ({ id }) => {
           try {

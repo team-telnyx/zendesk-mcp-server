@@ -4,10 +4,10 @@ import { z } from 'zod';
     export const automationsTools = [
       {
         name: "list_automations",
-        description: "List automations in Zendesk",
+        description: "List automations with pagination support. Returns first page only (default: up to 100 automations). Use get_automation if you have the automation ID. WARNING: May return large datasets - use pagination parameters (page, per_page) to limit results.",
         schema: {
-          page: z.number().optional().describe("Page number for pagination"),
-          per_page: z.number().optional().describe("Number of automations per page (max 100)")
+          page: z.number().int().optional().describe("Page number for pagination"),
+          per_page: z.number().int().optional().describe("Number of automations per page (max 100)")
         },
         handler: async ({ page, per_page }) => {
           try {
@@ -29,9 +29,9 @@ import { z } from 'zod';
       },
       {
         name: "get_automation",
-        description: "Get a specific automation by ID",
+        description: "Get a specific automation by ID. PREFERRED over list_automations when you have the automation ID. Returns complete automation details including conditions and actions.",
         schema: {
-          id: z.number().describe("Automation ID")
+          id: z.number().int().describe("Automation ID")
         },
         handler: async ({ id }) => {
           try {
@@ -52,7 +52,7 @@ import { z } from 'zod';
       },
       {
         name: "create_automation",
-        description: "Create a new automation",
+        description: "Create a new automation in Zendesk. MODERATE RISK: This will create new data. Requires title, conditions, and actions. Returns the created automation with its ID.",
         schema: {
           title: z.string().describe("Automation title"),
           description: z.string().optional().describe("Automation description"),
@@ -99,9 +99,9 @@ import { z } from 'zod';
       },
       {
         name: "update_automation",
-        description: "Update an existing automation",
+        description: "Update an existing automation by ID. MODERATE RISK: This will modify existing data. Supports updating title, description, conditions, and actions. Returns the updated automation.",
         schema: {
-          id: z.number().describe("Automation ID to update"),
+          id: z.number().int().describe("Automation ID to update"),
           title: z.string().optional().describe("Updated automation title"),
           description: z.string().optional().describe("Updated automation description"),
           conditions: z.object({

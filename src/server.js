@@ -91,6 +91,9 @@ function createServer() {
       });
     }
 
+    // Register tool with Zod schema
+    // The SDK automatically converts Zod schemas to JSON Schema using zodToJsonSchema,
+    // which already adds additionalProperties: false by default (verified via testing)
     server.tool(
       tool.name,
       tool.schema,
@@ -235,4 +238,4 @@ function createServer() {
   return server;
 }
 
-export { createServer };
+export { createServer, getToolRiskInfo };
