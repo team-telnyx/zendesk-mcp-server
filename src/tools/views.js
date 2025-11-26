@@ -6,8 +6,8 @@ import { z } from 'zod';
         name: "list_views",
         description: "List views in Zendesk",
         schema: {
-          page: z.number().optional().describe("Page number for pagination"),
-          per_page: z.number().optional().describe("Number of views per page (max 100)")
+          page: z.number().int().optional().describe("Page number for pagination"),
+          per_page: z.number().int().optional().describe("Number of views per page (max 100)")
         },
         handler: async ({ page, per_page }) => {
           try {
@@ -31,7 +31,7 @@ import { z } from 'zod';
         name: "get_view",
         description: "Get a specific view by ID",
         schema: {
-          id: z.number().describe("View ID")
+          id: z.number().int().describe("View ID")
         },
         handler: async ({ id }) => {
           try {

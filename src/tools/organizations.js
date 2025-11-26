@@ -6,8 +6,8 @@ import { z } from 'zod';
         name: "list_organizations",
         description: "List organizations in Zendesk",
         schema: {
-          page: z.number().optional().describe("Page number for pagination"),
-          per_page: z.number().optional().describe("Number of organizations per page (max 100)")
+          page: z.number().int().optional().describe("Page number for pagination"),
+          per_page: z.number().int().optional().describe("Number of organizations per page (max 100)")
         },
         handler: async ({ page, per_page }) => {
           try {
@@ -31,7 +31,7 @@ import { z } from 'zod';
         name: "get_organization",
         description: "Get a specific organization by ID",
         schema: {
-          id: z.number().describe("Organization ID")
+          id: z.number().int().describe("Organization ID")
         },
         handler: async ({ id }) => {
           try {

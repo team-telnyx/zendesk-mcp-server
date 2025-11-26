@@ -6,8 +6,8 @@ import { z } from 'zod';
         name: "list_chats",
         description: "List Zendesk Chat conversations",
         schema: {
-          page: z.number().optional().describe("Page number for pagination"),
-          per_page: z.number().optional().describe("Number of chats per page (max 100)")
+          page: z.number().int().optional().describe("Page number for pagination"),
+          per_page: z.number().int().optional().describe("Number of chats per page (max 100)")
         },
         handler: async ({ page, per_page }) => {
           try {

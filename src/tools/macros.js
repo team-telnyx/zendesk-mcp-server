@@ -6,8 +6,8 @@ import { z } from 'zod';
         name: "list_macros",
         description: "List macros in Zendesk",
         schema: {
-          page: z.number().optional().describe("Page number for pagination"),
-          per_page: z.number().optional().describe("Number of macros per page (max 100)")
+          page: z.number().int().optional().describe("Page number for pagination"),
+          per_page: z.number().int().optional().describe("Number of macros per page (max 100)")
         },
         handler: async ({ page, per_page }) => {
           try {
@@ -31,7 +31,7 @@ import { z } from 'zod';
         name: "get_macro",
         description: "Get a specific macro by ID",
         schema: {
-          id: z.number().describe("Macro ID")
+          id: z.number().int().describe("Macro ID")
         },
         handler: async ({ id }) => {
           try {
