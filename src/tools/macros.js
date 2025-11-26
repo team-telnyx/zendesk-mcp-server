@@ -4,7 +4,7 @@ import { z } from 'zod';
     export const macrosTools = [
       {
         name: "list_macros",
-        description: "List macros in Zendesk",
+        description: "List macros with pagination support. Returns first page only (default: up to 100 macros). WARNING: Returns very large datasets (~50k tokens). Always use pagination (page, per_page) or prefer get_macro if you have the macro ID.",
         schema: {
           page: z.number().int().optional().describe("Page number for pagination"),
           per_page: z.number().int().optional().describe("Number of macros per page (max 100)")
@@ -29,7 +29,7 @@ import { z } from 'zod';
       },
       {
         name: "get_macro",
-        description: "Get a specific macro by ID",
+        description: "Get a specific macro by ID. PREFERRED over list_macros when you have the macro ID. Returns complete macro details. Use this instead of list_macros to avoid large dataset responses (~50k tokens).",
         schema: {
           id: z.number().int().describe("Macro ID")
         },
@@ -52,7 +52,7 @@ import { z } from 'zod';
       },
       {
         name: "create_macro",
-        description: "Create a new macro",
+        description: "Create a new macro in Zendesk. MODERATE RISK: This will create new data. Requires title and actions. Returns the created macro with its ID.",
         schema: {
           title: z.string().describe("Macro title"),
           description: z.string().optional().describe("Macro description"),
@@ -86,9 +86,9 @@ import { z } from 'zod';
       },
       {
         name: "update_macro",
-        description: "Update an existing macro",
+        description: "Update an existing macro by ID. MODERATE RISK: This will modify existing data. Supports updating title, description, and actions. Returns the updated macro.",
         schema: {
-          id: z.number().describe("Macro ID to update"),
+          id: z.number().int().describe("Macro ID to update"),
           title: z.string().optional().describe("Updated macro title"),
           description: z.string().optional().describe("Updated macro description"),
           actions: z.array(z.object({
@@ -121,9 +121,9 @@ import { z } from 'zod';
       },
       {
         name: "delete_macro",
-        description: "Delete a macro",
+        description: "Delete a macro by ID. HIGH RISK: This permanently deletes the macro and cannot be undone. Use with extreme caution.",
         schema: {
-          id: z.number().describe("Macro ID to delete")
+          id: z.number().int().describe("Macro ID to delete")
         },
         handler: async ({ id }) => {
           try {

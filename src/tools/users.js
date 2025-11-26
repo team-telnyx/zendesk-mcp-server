@@ -4,7 +4,7 @@ import { z } from 'zod';
     export const usersTools = [
       {
         name: "list_users",
-        description: "List users in Zendesk",
+        description: "List users with pagination support. Returns first page only (default: up to 100 users). Use get_user if you have a specific user ID. Supports filtering by role (end-user, agent, admin). WARNING: May return large datasets - use pagination parameters (page, per_page) to limit results.",
         schema: {
           page: z.number().int().optional().describe("Page number for pagination"),
           per_page: z.number().int().optional().describe("Number of users per page (max 100)"),
@@ -30,7 +30,7 @@ import { z } from 'zod';
       },
       {
         name: "get_user",
-        description: "Get a specific user by ID",
+        description: "Get a specific user by ID. PREFERRED over list_users when you have the user ID. Returns complete user details including name, email, role, and organization.",
         schema: {
           id: z.number().int().describe("User ID")
         },
@@ -53,7 +53,7 @@ import { z } from 'zod';
       },
       {
         name: "create_user",
-        description: "Create a new user",
+        description: "Create a new user in Zendesk. MODERATE RISK: This will create new data. Requires name and email. Returns the created user with its ID.",
         schema: {
           name: z.string().describe("User's full name"),
           email: z.string().email().describe("User's email address"),
@@ -92,7 +92,7 @@ import { z } from 'zod';
       },
       {
         name: "update_user",
-        description: "Update an existing user",
+        description: "Update an existing user by ID. MODERATE RISK: This will modify existing data. Supports updating name, email, role, phone, organization, tags, and notes. Returns the updated user.",
         schema: {
           id: z.number().int().describe("User ID to update"),
           name: z.string().optional().describe("Updated user's name"),

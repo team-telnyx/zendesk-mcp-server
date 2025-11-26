@@ -4,7 +4,7 @@ import { z } from 'zod';
     export const triggersTools = [
       {
         name: "list_triggers",
-        description: "List triggers in Zendesk",
+        description: "List triggers with pagination support. Returns first page only (default: up to 100 triggers). Use get_trigger if you have the trigger ID. WARNING: May return large datasets - use pagination parameters (page, per_page) to limit results.",
         schema: {
           page: z.number().int().optional().describe("Page number for pagination"),
           per_page: z.number().int().optional().describe("Number of triggers per page (max 100)")
@@ -29,7 +29,7 @@ import { z } from 'zod';
       },
       {
         name: "get_trigger",
-        description: "Get a specific trigger by ID",
+        description: "Get a specific trigger by ID. PREFERRED over list_triggers when you have the trigger ID. Returns complete trigger details including conditions and actions.",
         schema: {
           id: z.number().int().describe("Trigger ID")
         },
@@ -52,7 +52,7 @@ import { z } from 'zod';
       },
       {
         name: "create_trigger",
-        description: "Create a new trigger",
+        description: "Create a new trigger in Zendesk. MODERATE RISK: This will create new data. Requires title, conditions, and actions. Returns the created trigger with its ID.",
         schema: {
           title: z.string().describe("Trigger title"),
           description: z.string().optional().describe("Trigger description"),
@@ -99,9 +99,9 @@ import { z } from 'zod';
       },
       {
         name: "update_trigger",
-        description: "Update an existing trigger",
+        description: "Update an existing trigger by ID. MODERATE RISK: This will modify existing data. Supports updating title, description, conditions, and actions. Returns the updated trigger.",
         schema: {
-          id: z.number().describe("Trigger ID to update"),
+          id: z.number().int().describe("Trigger ID to update"),
           title: z.string().optional().describe("Updated trigger title"),
           description: z.string().optional().describe("Updated trigger description"),
           conditions: z.object({

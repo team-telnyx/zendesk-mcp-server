@@ -4,7 +4,7 @@ import { z } from 'zod';
     export const talkTools = [
       {
         name: "get_talk_stats",
-        description: "Get Zendesk Talk statistics",
+        description: "Get Zendesk Talk statistics. Returns comprehensive Talk metrics and statistics. This is a read-only operation that fetches current Talk system statistics.",
         schema: {},
         handler: async () => {
           try {

@@ -4,7 +4,7 @@ import { z } from 'zod';
     export const groupsTools = [
       {
         name: "list_groups",
-        description: "List agent groups in Zendesk",
+        description: "List agent groups with pagination support. Returns first page only (default: up to 100 groups). Use get_group if you have the group ID. WARNING: May return large datasets - use pagination parameters (page, per_page) to limit results.",
         schema: {
           page: z.number().int().optional().describe("Page number for pagination"),
           per_page: z.number().int().optional().describe("Number of groups per page (max 100)")
@@ -29,7 +29,7 @@ import { z } from 'zod';
       },
       {
         name: "get_group",
-        description: "Get a specific group by ID",
+        description: "Get a specific group by ID. PREFERRED over list_groups when you have the group ID. Returns complete group details including name and description.",
         schema: {
           id: z.number().int().describe("Group ID")
         },
@@ -52,7 +52,7 @@ import { z } from 'zod';
       },
       {
         name: "create_group",
-        description: "Create a new agent group",
+        description: "Create a new agent group in Zendesk. MODERATE RISK: This will create new data. Requires name. Returns the created group with its ID.",
         schema: {
           name: z.string().describe("Group name"),
           description: z.string().optional().describe("Group description")
@@ -81,9 +81,9 @@ import { z } from 'zod';
       },
       {
         name: "update_group",
-        description: "Update an existing group",
+        description: "Update an existing group by ID. MODERATE RISK: This will modify existing data. Supports updating name and description. Returns the updated group.",
         schema: {
-          id: z.number().describe("Group ID to update"),
+          id: z.number().int().describe("Group ID to update"),
           name: z.string().optional().describe("Updated group name"),
           description: z.string().optional().describe("Updated group description")
         },

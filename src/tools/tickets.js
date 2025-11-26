@@ -4,7 +4,7 @@ import { zendeskClient } from '../zendesk-client.js';
 export const ticketsTools = [
   {
     name: "list_tickets",
-    description: "List tickets in Zendesk",
+    description: "List tickets with pagination support. Returns first page only (default: up to 100 tickets). Use get_ticket if you have a specific ticket ID. Supports filtering via sort_by and sort_order. WARNING: May return large datasets - use pagination parameters (page, per_page) to limit results.",
     schema: {
       page: z.number().int().optional().describe("Page number for pagination"),
       per_page: z.number().int().optional().describe("Number of tickets per page (max 100)"),
@@ -31,7 +31,7 @@ export const ticketsTools = [
   },
   {
     name: "get_ticket",
-    description: "Get a specific ticket by ID with human-readable names for requester, assignee, and group",
+    description: "Get a specific ticket by ID with human-readable names for requester, assignee, and group. PREFERRED over list_tickets when you have the ticket ID. Returns complete ticket details including formatted output with names.",
     schema: {
       id: z.number().int().describe("Ticket ID"),
       include_names: z.boolean().optional().describe("Fetch and include names for requester, assignee, and group (default: true)")
@@ -167,7 +167,7 @@ export const ticketsTools = [
   },
   {
     name: "list_ticket_comments",
-    description: "List all comments (public and private) for a specific ticket with pagination support. Each comment clearly shows its public/private status.",
+    description: "List comments for a specific ticket with pagination. Returns first page only (default: up to 100 comments). Each comment shows public/private status. Use summarize_ticket_comments if you need all comments analyzed. Use count_ticket_comments first to determine pagination needs.",
     schema: {
       id: z.number().int().describe("Ticket ID"),
       page: z.number().int().optional().describe("Page number for pagination"),
@@ -241,7 +241,7 @@ export const ticketsTools = [
   },
   {
     name: "count_ticket_comments",
-    description: "Get the count of comments (public and private) for a specific ticket. Use this to determine how many pages you need to fetch all comments.",
+    description: "Get the count of comments for a specific ticket. Use this to determine pagination needs before calling list_ticket_comments. Returns total count without fetching all comment data.",
     schema: {
       id: z.number().int().describe("Ticket ID")
     },
@@ -271,7 +271,7 @@ export const ticketsTools = [
   },
   {
     name: "summarize_ticket_comments",
-    description: "Get a summary of all comments for a ticket showing public vs private breakdown and customer vs agent identification. Fetches all comments across multiple pages automatically and identifies comment authors.",
+    description: "Get a comprehensive summary of all ticket comments. Automatically fetches all pages and provides analyzed output with public/private breakdown and customer vs agent identification. PREFERRED over list_ticket_comments when you need complete comment analysis rather than browsing individual comments.",
     schema: {
       id: z.number().int().describe("Ticket ID"),
       max_comments: z.number().int().optional().describe("Maximum number of comments to fetch (default: 1000)"),
@@ -425,7 +425,7 @@ export const ticketsTools = [
   },
   {
     name: "get_ticket_comment",
-    description: "Get a specific comment by ID from a ticket. Clearly shows if the comment is public or private.",
+    description: "Get a specific comment by ID from a ticket. PREFERRED over list_ticket_comments when you have the comment ID. Clearly shows if the comment is public or private.",
     schema: {
       ticket_id: z.number().int().describe("Ticket ID"),
       comment_id: z.number().int().describe("Comment ID")
@@ -477,7 +477,7 @@ export const ticketsTools = [
   },
   {
     name: "create_ticket",
-    description: "Create a new ticket",
+    description: "Create a new ticket in Zendesk. MODERATE RISK: This will create new data. Requires subject and comment. Returns the created ticket with its ID.",
     schema: {
       subject: z.string().describe("Ticket subject"),
       comment: z.string().describe("Ticket comment/description"),
@@ -520,7 +520,7 @@ export const ticketsTools = [
   },
   {
     name: "update_ticket",
-    description: "Update an existing ticket. Supports updating standard fields and custom fields.",
+    description: "Update an existing ticket by ID. MODERATE RISK: This will modify existing data. Supports updating standard fields (subject, status, priority, assignee, group, type, tags) and custom fields. Returns the updated ticket.",
     schema: {
       id: z.number().int().describe("Ticket ID to update"),
       subject: z.string().optional().describe("Updated ticket subject"),

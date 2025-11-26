@@ -4,7 +4,7 @@ import { z } from 'zod';
     export const chatTools = [
       {
         name: "list_chats",
-        description: "List Zendesk Chat conversations",
+        description: "List Zendesk Chat conversations with pagination support. Returns first page only (default: up to 100 chats). WARNING: May return large datasets - use pagination parameters (page, per_page) to limit results.",
         schema: {
           page: z.number().int().optional().describe("Page number for pagination"),
           per_page: z.number().int().optional().describe("Number of chats per page (max 100)")

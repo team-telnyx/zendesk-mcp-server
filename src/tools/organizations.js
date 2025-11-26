@@ -4,7 +4,7 @@ import { z } from 'zod';
     export const organizationsTools = [
       {
         name: "list_organizations",
-        description: "List organizations in Zendesk",
+        description: "List organizations with pagination support. Returns first page only (default: up to 100 organizations). Use get_organization if you have the organization ID. WARNING: May return large datasets (~17k tokens) - use pagination parameters (page, per_page) to limit results.",
         schema: {
           page: z.number().int().optional().describe("Page number for pagination"),
           per_page: z.number().int().optional().describe("Number of organizations per page (max 100)")
@@ -29,7 +29,7 @@ import { z } from 'zod';
       },
       {
         name: "get_organization",
-        description: "Get a specific organization by ID",
+        description: "Get a specific organization by ID. PREFERRED over list_organizations when you have the organization ID. Returns complete organization details. Use this instead of list_organizations to avoid large dataset responses.",
         schema: {
           id: z.number().int().describe("Organization ID")
         },
@@ -52,7 +52,7 @@ import { z } from 'zod';
       },
       {
         name: "create_organization",
-        description: "Create a new organization",
+        description: "Create a new organization in Zendesk. MODERATE RISK: This will create new data. Requires name. Returns the created organization with its ID.",
         schema: {
           name: z.string().describe("Organization name"),
           domain_names: z.array(z.string()).optional().describe("Domain names for the organization"),
@@ -87,9 +87,9 @@ import { z } from 'zod';
       },
       {
         name: "update_organization",
-        description: "Update an existing organization",
+        description: "Update an existing organization by ID. MODERATE RISK: This will modify existing data. Supports updating name, domain_names, details, notes, and tags. Returns the updated organization.",
         schema: {
-          id: z.number().describe("Organization ID to update"),
+          id: z.number().int().describe("Organization ID to update"),
           name: z.string().optional().describe("Updated organization name"),
           domain_names: z.array(z.string()).optional().describe("Updated domain names"),
           details: z.string().optional().describe("Updated details"),
