@@ -238,4 +238,4 @@ function createServer() {
   return server;
 }
 
-export { createServer };
+export { createServer, getToolRiskInfo };

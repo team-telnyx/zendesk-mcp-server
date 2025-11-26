@@ -2,9 +2,26 @@
 import express from 'express';
 import { randomUUID } from 'node:crypto';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import { createServer } from './server.js';
+import { createServer, getToolRiskInfo } from './server.js';
 import dotenv from 'dotenv';
 import morgan from 'morgan';
+import { z } from 'zod';
+import { ticketsTools } from './tools/tickets.js';
+import { usersTools } from './tools/users.js';
+import { organizationsTools } from './tools/organizations.js';
+import { groupsTools } from './tools/groups.js';
+import { macrosTools } from './tools/macros.js';
+import { viewsTools } from './tools/views.js';
+import { triggersTools } from './tools/triggers.js';
+import { automationsTools } from './tools/automations.js';
+import { searchTools } from './tools/search.js';
+import { helpCenterTools } from './tools/help-center.js';
+import { supportTools } from './tools/support.js';
+import { talkTools } from './tools/talk.js';
+import { chatTools } from './tools/chat.js';
+
+// Import zod-to-json-schema (available as transitive dependency via SDK)
+import { zodToJsonSchema } from 'zod-to-json-schema';
 
 // Load environment variables
 dotenv.config();
@@ -128,6 +145,95 @@ zendesk_mcp_server_active_sessions ${activeConnections.size}
 # TYPE zendesk_mcp_server_total_connections counter
 zendesk_mcp_server_total_connections ${connectionCounter}
 `);
+});
+
+// Tools listing endpoint - returns all tools with their schemas
+app.get('/tools', (req, res) => {
+  try {
+    // Collect all tools
+    const allTools = [
+      ...ticketsTools,
+      ...usersTools,
+      ...organizationsTools,
+      ...groupsTools,
+      ...macrosTools,
+      ...viewsTools,
+      ...triggersTools,
+      ...automationsTools,
+      ...searchTools,
+      ...helpCenterTools,
+      ...supportTools,
+      ...talkTools,
+      ...chatTools
+    ];
+
+    // Convert tools to API format
+    const toolsList = allTools.map(tool => {
+      const riskInfo = getToolRiskInfo(tool.name, tool.description);
+      const enhancedDescription = `${riskInfo.prefix}${tool.description}`;
+      
+      // Convert Zod schema to JSON Schema
+      let jsonSchema = null;
+      if (tool.schema && Object.keys(tool.schema).length > 0) {
+        try {
+          // Convert Zod schema object to z.object
+          const zodObject = z.object(tool.schema);
+          jsonSchema = zodToJsonSchema(zodObject, {
+            target: 'openApi3',
+            $refStrategy: 'none',
+            strictUnions: true
+          });
+          // Ensure additionalProperties: false is set
+          if (jsonSchema && typeof jsonSchema === 'object') {
+            jsonSchema.additionalProperties = false;
+            if (jsonSchema.properties) {
+              for (const prop of Object.values(jsonSchema.properties)) {
+                if (prop && typeof prop === 'object') {
+                  prop.additionalProperties = false;
+                }
+              }
+            }
+          }
+        } catch (error) {
+          console.error(`Error converting schema for ${tool.name}:`, error.message);
+          jsonSchema = {
+            type: 'object',
+            properties: {},
+            additionalProperties: false
+          };
+        }
+      } else {
+        jsonSchema = {
+          type: 'object',
+          properties: {},
+          additionalProperties: false
+        };
+      }
+
+      return {
+        name: tool.name,
+        description: enhancedDescription,
+        baseDescription: tool.description,
+        riskLevel: riskInfo.riskLevel,
+        isRisky: riskInfo.isRisky,
+        schema: jsonSchema
+      };
+    });
+
+    res.json({
+      service: 'zendesk-mcp-server',
+      version: '1.0.0',
+      total: toolsList.length,
+      tools: toolsList,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      error: 'Failed to list tools',
+      message: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
 });
 
 // Connections status endpoint
@@ -426,12 +532,14 @@ app.listen(port, () => {
     // Local development - show localhost URLs
     console.log(`${GREEN}Streamable HTTP MCP: ${baseUrl}/mcp${NC}`);
     console.log(`${GREEN}Health Check: ${baseUrl}/health${NC}`);
+    console.log(`${GREEN}Tools API: ${baseUrl}/tools${NC}`);
     console.log(`${GREEN}Connections: ${baseUrl}/connections${NC}`);
     console.log(`${GREEN}Metrics: ${baseUrl}/metrics${NC}`);
   } else {
     // Remote environment (dev/prod) - show remote URLs
     console.log(`${GREEN}Streamable HTTP MCP: ${baseUrl}/mcp${NC}`);
     console.log(`${GREEN}Health Check: ${baseUrl}/health${NC}`);
+    console.log(`${GREEN}Tools API: ${baseUrl}/tools${NC}`);
     console.log(`${GREEN}Connections: ${baseUrl}/connections${NC}`);
     console.log(`${GREEN}Metrics: ${baseUrl}/metrics${NC}`);
   }
