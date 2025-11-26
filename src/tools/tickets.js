@@ -520,7 +520,7 @@ export const ticketsTools = [
   },
   {
     name: "update_ticket",
-    description: "Update an existing ticket",
+    description: "Update an existing ticket. Supports updating standard fields and custom fields.",
     schema: {
       id: z.number().describe("Ticket ID to update"),
       subject: z.string().optional().describe("Updated ticket subject"),
@@ -530,9 +530,13 @@ export const ticketsTools = [
       assignee_id: z.number().optional().describe("User ID of the new assignee"),
       group_id: z.number().optional().describe("New group ID for the ticket"),
       type: z.enum(["problem", "incident", "question", "task"]).optional().describe("Updated ticket type"),
-      tags: z.array(z.string()).optional().describe("Updated tags for the ticket")
+      tags: z.array(z.string()).optional().describe("Updated tags for the ticket"),
+      custom_fields: z.array(z.object({
+        id: z.union([z.number(), z.string()]).describe("Custom field ID"),
+        value: z.union([z.string(), z.number(), z.boolean(), z.null()]).describe("Value to set for the custom field")
+      })).optional().describe("Array of custom fields to update")
     },
-    handler: async ({ id, subject, comment, priority, status, assignee_id, group_id, type, tags }) => {
+    handler: async ({ id, subject, comment, priority, status, assignee_id, group_id, type, tags, custom_fields }) => {
       try {
         const ticketData = {};
 
@@ -544,6 +548,7 @@ export const ticketsTools = [
         if (group_id !== undefined) ticketData.group_id = group_id;
         if (type !== undefined) ticketData.type = type;
         if (tags !== undefined) ticketData.tags = tags;
+        if (custom_fields !== undefined) ticketData.custom_fields = custom_fields;
 
         const result = await zendeskClient.updateTicket(id, ticketData);
         return {
