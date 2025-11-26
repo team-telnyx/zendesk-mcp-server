@@ -548,7 +548,7 @@ export const ticketsTools = [
         if (group_id !== undefined) ticketData.group_id = group_id;
         if (type !== undefined) ticketData.type = type;
         if (tags !== undefined) ticketData.tags = tags;
-        if (custom_fields !== undefined) ticketData.custom_fields = custom_fields;
+        if (custom_fields !== undefined && custom_fields.length > 0) ticketData.custom_fields = custom_fields;
 
         const result = await zendeskClient.updateTicket(id, ticketData);
         return {
