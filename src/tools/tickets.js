@@ -532,6 +532,7 @@ export const ticketsTools = [
       type: z.enum(["problem", "incident", "question", "task"]).optional().describe("Updated ticket type"),
       tags: z.array(z.string()).optional().describe("Updated tags for the ticket"),
       custom_fields: z.array(z.object({
+        // Custom field ID can be numeric (integer) or string identifier (Zendesk API supports both)
         id: z.union([z.number().int(), z.string()]).describe("Custom field ID"),
         value: z.union([z.string(), z.number(), z.boolean(), z.array(z.string()), z.null()]).describe("Value to set for the custom field")
       })).optional().describe("Array of custom fields to update")

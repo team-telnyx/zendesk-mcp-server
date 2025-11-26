@@ -52,7 +52,7 @@ function getAllToolsExcludingMeta() {
 export const supportTools = [
   {
     name: "list_risky_tools",
-    description: "List all risky tools that can modify or delete data in Zendesk. Use this to identify which tools require caution before use. Returns tools categorized by risk level (HIGH RISK for delete operations, MODERATE RISK for create/update operations). Filter by category to see specific risk levels.",
+    description: "List all risky tools that can modify or delete data in Zendesk. Use this to identify which tools require caution before use. Returns tools categorized by risk level (HIGH RISK for delete operations, MODERATE RISK for create/update operations). Use category parameter: 'all' (default) returns all risky tools grouped by level, 'high_risk' returns only delete operations, 'moderate_risk' returns only create/update operations.",
     schema: {
       category: z.enum(["all", "high_risk", "moderate_risk"]).optional().describe("Filter by risk level: all (default), high_risk (delete operations), or moderate_risk (create/update operations)")
     },
