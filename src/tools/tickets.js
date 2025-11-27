@@ -520,11 +520,12 @@ export const ticketsTools = [
   },
   {
     name: "update_ticket",
-    description: "Update an existing ticket by ID. MODERATE RISK: This will modify existing data. Supports updating standard fields (subject, status, priority, assignee, group, type, tags) and custom fields. Returns the updated ticket.",
+    description: "Update an existing ticket by ID. MODERATE RISK: This will modify existing data. Supports updating standard fields (subject, status, priority, assignee, group, type, tags) and custom fields. Can add public or private comments. Returns the updated ticket.",
     schema: {
       id: z.number().int().describe("Ticket ID to update"),
       subject: z.string().optional().describe("Updated ticket subject"),
       comment: z.string().optional().describe("New comment to add"),
+      comment_public: z.boolean().optional().describe("Whether the comment is public (true) or private/internal (false). Defaults to true if comment is provided. Set to false to create an internal note visible only to agents."),
       priority: z.enum(["urgent", "high", "normal", "low"]).optional().describe("Updated ticket priority"),
       status: z.enum(["new", "open", "pending", "hold", "solved", "closed"]).optional().describe("Updated ticket status"),
       assignee_id: z.number().int().optional().describe("User ID of the new assignee"),
@@ -537,12 +538,16 @@ export const ticketsTools = [
         value: z.union([z.string(), z.number(), z.boolean(), z.array(z.string()), z.null()]).describe("Value to set for the custom field")
       })).optional().describe("Array of custom fields to update")
     },
-    handler: async ({ id, subject, comment, priority, status, assignee_id, group_id, type, tags, custom_fields }) => {
+    handler: async ({ id, subject, comment, comment_public, priority, status, assignee_id, group_id, type, tags, custom_fields }) => {
       try {
         const ticketData = {};
 
         if (subject !== undefined) ticketData.subject = subject;
-        if (comment !== undefined) ticketData.comment = { body: comment };
+        if (comment !== undefined) {
+          ticketData.comment = { body: comment };
+          // Set public field: default to true if not specified, otherwise use provided value
+          ticketData.comment.public = comment_public !== undefined ? comment_public : true;
+        }
         if (priority !== undefined) ticketData.priority = priority;
         if (status !== undefined) ticketData.status = status;
         if (assignee_id !== undefined) ticketData.assignee_id = assignee_id;
